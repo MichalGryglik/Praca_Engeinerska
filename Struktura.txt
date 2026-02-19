@@ -1,0 +1,28 @@
+C:\Projekty\Praca_Engeinerska/
+│
+├── main.py
+│
+├── core/
+│   ├── __init__.py
+│   ├── membership_functions.py
+│   ├── inference.py
+│   ├── utils.py
+│   │
+│   └── rule_generators/
+│       ├── __init__.py
+│       ├── wang_mendel.py
+│       ├── subtractive.py
+│       └── grid_partition.py
+│
+├── examples/
+│   ├── __init__.py
+│   ├── example1_config.py
+│   ├── example2_config.py
+│   ├── example3_config.py
+│   └── example4_config.py
+│
+└── data/
+    ├── example1_data
+    ├── example2_data
+    ├── example3_data
+    └── example4_data
