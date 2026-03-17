@@ -205,9 +205,70 @@ def compute_normalized_firing_strengths(data, inputs, rules_dict, fuzzy_sets, un
 
 
 def update_consequents_ls_wls(data, inputs, outputs, rules_dict, normalized_strengths):
-    """TODO: Zaktualizuj parametry części THEN metodą LS/WLS."""
-    _ = (data, inputs, outputs, rules_dict, normalized_strengths)
-    pass
+    """Aktualizuje parametry części THEN metodą ważonych najmniejszych kwadratów.
+
+    Dla każdej reguły i każdego wyjścia dopasowywany jest liniowy model Sugeno:
+    y = a0 + a1*x1 + ... + an*xn,
+    gdzie wagi próbek pochodzą z `normalized_strengths`.
+
+    Funkcja aktualizuje `rules_dict` in-place i dodatkowo zwraca ten sam obiekt
+    dla wygody łańcuchowania.
+    """
+    # Walidujemy format wejścia z aktywacjami znormalizowanymi
+    if "rule_ids" not in normalized_strengths or "normalized" not in normalized_strengths:
+        raise ValueError("normalized_strengths musi zawierać klucze 'rule_ids' i 'normalized'.")
+
+    rule_ids = normalized_strengths["rule_ids"]
+    w_norm = np.asarray(normalized_strengths["normalized"], dtype=float)
+
+    # Gdy nie ma reguł albo próbek, nie ma czego aktualizować
+    if len(rule_ids) == 0 or len(data) == 0:
+        return rules_dict
+
+    # Budujemy macierz regresji z wyrazem wolnym: [1, x1, ..., xn]
+    x_raw = data[inputs].to_numpy(dtype=float)
+    n_samples = x_raw.shape[0]
+    x_design = np.hstack([np.ones((n_samples, 1), dtype=float), x_raw])
+
+    # Dla każdego wyjścia wykonujemy osobne dopasowanie współczynników
+    for output_name in outputs:
+        y = data[output_name].to_numpy(dtype=float)
+
+        # Iterujemy po regułach zgodnie z kolejnością kolumn w macierzy wag
+        for rule_col, rule_id in enumerate(rule_ids):
+            # Jeżeli reguła zniknęła (np. po adaptacji), pomijamy ją bez błędu
+            if rule_id not in rules_dict:
+                continue
+
+            weights = w_norm[:, rule_col]
+
+            # Jeżeli łączna waga jest praktycznie zerowa, zostawiamy stare współczynniki
+            if np.sum(weights) <= 1e-12:
+                continue
+
+            # Tworzymy postać WLS przez przemnożenie przez sqrt(w):
+            # (sqrt(W)X) beta = sqrt(W)y
+            sqrt_w = np.sqrt(np.clip(weights, 0.0, None))
+            x_weighted = x_design * sqrt_w[:, None]
+            y_weighted = y * sqrt_w
+
+            # Rozwiązujemy układ najmniejszych kwadratów;
+            # lstsq jest stabilne numerycznie także dla układów osobliwych
+            coeffs, _, _, _ = np.linalg.lstsq(x_weighted, y_weighted, rcond=None)
+
+            # Upewniamy się, że istnieje struktura konsekwentu dla danego wyjścia
+            consequent = rules_dict[rule_id].setdefault("consequent", {})
+            consequent_entry = consequent.setdefault(
+                output_name,
+                {"type": "linear", "coefficients": np.zeros(len(inputs) + 1, dtype=float)},
+            )
+
+            # Aktualizujemy typ i współczynniki modelu liniowego Sugeno
+            consequent_entry["type"] = "linear"
+            consequent_entry["coefficients"] = coeffs.astype(float)
+
+    # Zwracamy zaktualizowany słownik reguł
+    return rules_dict
 
 
 def update_antecedents(data, inputs, rules_dict, normalized_strengths, eps_sigma):
