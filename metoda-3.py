@@ -124,9 +124,84 @@ def build_initial_rules_from_clusters(centers, inputs, outputs, eps_sigma):
 
 
 def compute_normalized_firing_strengths(data, inputs, rules_dict, fuzzy_sets, universes):
-    """TODO: Oblicz i znormalizuj siły aktywacji reguł dla każdej próbki."""
-    _ = (data, inputs, rules_dict, fuzzy_sets, universes)
-    pass
+    """Oblicza i normalizuje siły aktywacji reguł dla każdej próbki.
+
+    W aktualnym szkielecie aktywacja poprzedników jest liczona na podstawie
+    parametrów gaussowskich zapisanych w każdej regule (`center`, `sigma`).
+    Parametry `fuzzy_sets` i `universes` zostają w sygnaturze dla spójności
+    interfejsu i przyszłej rozbudowy.
+
+    Returns
+    -------
+    dict
+        {
+            "rule_ids": list[int],
+            "raw": np.ndarray shape (n_samples, n_rules),
+            "normalized": np.ndarray shape (n_samples, n_rules)
+        }
+    """
+    # Zachowujemy parametry dla kompatybilności z dalszą implementacją pipeline'u
+    _ = (fuzzy_sets, universes)
+
+    # Jeżeli nie ma reguł, zwracamy puste macierze o odpowiednim kształcie
+    if not rules_dict:
+        n_samples = len(data)
+        empty = np.zeros((n_samples, 0), dtype=float)
+        return {"rule_ids": [], "raw": empty, "normalized": empty}
+
+    # Pobieramy dane wejściowe w postaci macierzy numerycznej: (n_samples, n_inputs)
+    x = data[inputs].to_numpy(dtype=float)
+    n_samples = x.shape[0]
+
+    # Ustalamy kolejność reguł, aby mapowanie kolumn macierzy było jednoznaczne
+    rule_ids = sorted(rules_dict.keys())
+    n_rules = len(rule_ids)
+
+    # Inicjalizujemy macierz surowych sił aktywacji reguł
+    raw_strengths = np.zeros((n_samples, n_rules), dtype=float)
+
+    # Liczymy aktywację każdej reguły dla każdej próbki (T-norma jako iloczyn)
+    for rule_col, rule_id in enumerate(rule_ids):
+        rule_data = rules_dict[rule_id]
+        antecedent = rule_data.get("antecedent", {})
+
+        # Startujemy od jedynek, a następnie mnożymy przynależności gaussowskie
+        rule_firing = np.ones(n_samples, dtype=float)
+
+        for input_idx, input_name in enumerate(inputs):
+            # Pobieramy parametry poprzednika; gdy brakuje, używamy bezpiecznych domyślnych
+            params = antecedent.get(input_name, {})
+            center = float(params.get("center", 0.0))
+            sigma = max(float(params.get("sigma", 1.0)), 1e-6)
+
+            # Obliczamy wartość funkcji gaussowskiej dla całej kolumny próbek
+            # mu(x) = exp(-0.5 * ((x - c) / sigma)^2)
+            z = (x[:, input_idx] - center) / sigma
+            mu = np.exp(-0.5 * np.square(z))
+
+            # Aktualizujemy siłę odpalenia reguły (iloczyn po wszystkich wejściach)
+            rule_firing *= mu
+
+        raw_strengths[:, rule_col] = rule_firing
+
+    # Normalizujemy siły reguł per próbka: w_bar_i = w_i / sum_j(w_j)
+    normalized_strengths = np.zeros_like(raw_strengths)
+    row_sums = raw_strengths.sum(axis=1, keepdims=True)
+
+    # Dla próbek z dodatnią sumą wykonujemy standardową normalizację
+    valid_rows = row_sums.squeeze(axis=1) > 0.0
+    normalized_strengths[valid_rows] = raw_strengths[valid_rows] / row_sums[valid_rows]
+
+    # Dla przypadków degenerate (suma = 0) rozkładamy wagę równomiernie między reguły
+    if np.any(~valid_rows) and n_rules > 0:
+        normalized_strengths[~valid_rows] = 1.0 / n_rules
+
+    # Zwracamy komplet informacji (surowe i znormalizowane aktywacje)
+    return {
+        "rule_ids": rule_ids,
+        "raw": raw_strengths,
+        "normalized": normalized_strengths,
+    }
 
 
 def update_consequents_ls_wls(data, inputs, outputs, rules_dict, normalized_strengths):
