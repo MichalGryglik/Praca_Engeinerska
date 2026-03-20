@@ -1,9 +1,7 @@
 # main.py – punkt startowy programu
-import importlib.util
-from pathlib import Path
-
 import pandas as pd
 
+from core.rule_generators import Sugeno_Yasukawa as sy
 from core.rule_generators import nozaki_ishibuchi_tanaka as nit
 from core.rule_generators import wang_mendel as wm
 from examples import example1_config
@@ -72,25 +70,19 @@ print(f"Liczba aktywnych reguł NIT: {len(activated_nit)}")
 # ---------------------------------------------------------------------
 # CZĘŚĆ 3: Sugeno–Yasukawa – uruchomienie przygotowanych funkcji
 # ---------------------------------------------------------------------
-# Plik ma w nazwie myślnik, więc ładujemy go dynamicznie przez importlib.
-metoda_3_path = Path(__file__).with_name("metoda-3.py")
-spec = importlib.util.spec_from_file_location("metoda_3_module", metoda_3_path)
-metoda_3 = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(metoda_3)
-
 # Ustalamy podstawowe parametry testowego uruchomienia algorytmu.
 n_rules = 3
 eps_sigma = 0.1
 
 # Inicjalizujemy klastry metodą c-means, aby uzyskać środki reguł startowych.
-centers, membership_matrix = metoda_3.initialize_clusters_with_cmeans(
+centers, membership_matrix = sy.initialize_clusters_with_cmeans(
     data=data,
     inputs=example1_config.inputs,
     n_rules=n_rules,
 )
 
 # Budujemy początkową bazę reguł na podstawie środków klastrów.
-sugeno_rules = metoda_3.build_initial_rules_from_clusters(
+sugeno_rules = sy.build_initial_rules_from_clusters(
     centers=centers,
     inputs=example1_config.inputs,
     outputs=example1_config.outputs,
@@ -98,7 +90,7 @@ sugeno_rules = metoda_3.build_initial_rules_from_clusters(
 )
 
 # Obliczamy surowe i znormalizowane siły aktywacji dla wszystkich próbek.
-normalized_strengths_result = metoda_3.compute_normalized_firing_strengths(
+normalized_strengths_result = sy.compute_normalized_firing_strengths(
     data=data,
     inputs=example1_config.inputs,
     rules_dict=sugeno_rules,
