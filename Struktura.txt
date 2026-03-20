@@ -12,7 +12,7 @@
 │       ├── __init__.py
 │       ├── wang_mendel.py
 │       ├── nozaki_ishibuchi_tanaka.py
-│       └── metoda_3.py
+│       └── Sugeno_Yasukawa.py
 │
 ├── examples/
 │   ├── __init__.py
