@@ -16,5 +16,6 @@ Lekki framework badawczy do budowy i testowania baz reguł rozmytych.
    - Nozaki–Ishibuchi–Tanaka tworzy rozmyty konsekwent (wektor udziałów etykiet wyjścia).
 
 ## Obecny stan repozytorium
-- `core/inference.py`, `core/utils.py`, `examples/example2_config.py`, `example3_config.py`, `example4_config.py`, `core/rule_generators/metoda_3.py` są placeholders (`pass`).
+- `core/inference.py`, `core/utils.py`, `examples/example2_config.py`, `example3_config.py`, `example4_config.py` są placeholders (`pass`).
+- `core/rule_generators/Sugeno_Yasukawa.py` zawiera rozwijany szkic implementacji metody Sugeno–Yasukawa.
 - `Struktura.txt` to pomocniczy szkic katalogów; aktualny stan plików sprawdzaj przez `rg --files`.
