@@ -8,11 +8,6 @@ Lekki framework badawczy do budowy i testowania baz reguł rozmytych.
 - `core/rule_generators/` zawiera implementacje metod generowania i użycia reguł.
 - `examples/example1_config.py` definiuje uniwersa, zbiory i konfigurację wejść/wyjść dla przykładu 1.
 
-## Jak zacząć
-1. Utwórz środowisko i doinstaluj zależności: `numpy`, `pandas`, `scikit-fuzzy`.
-2. Uruchom `python main.py`.
-3. Zmodyfikuj `examples/example1_config.py` (np. zbiory, uniwersa), a potem ponownie uruchom skrypt.
-
 ## Co warto zrozumieć na początku
 1. **Przepływ danych**: dane wejściowe -> fuzyfikacja -> aktywacja reguł -> agregacja -> defuzyfikacja.
 2. **Rola konfiguracji**: jakość reguł i predykcji zależy głównie od definicji zbiorów rozmytych i uniwersów.
