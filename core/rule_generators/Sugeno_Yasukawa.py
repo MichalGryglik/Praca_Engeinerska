@@ -295,17 +295,6 @@ def estimate_local_errors(data, inputs, outputs, rules_dict, fuzzy_sets, univers
     pass
 
 
-def print_rules(rules_dict):
-    for rule_id, rule in rules_dict.items():
-        print(f"\nRule {rule_id}")
-
-        for var, params in rule["antecedent"].items():
-            print(f"  IF {var} ≈ {params['center']:.2f} (σ={params['sigma']:.2f})")
-
-        for out, cons in rule["consequent"].items():
-            coeffs = cons["coefficients"]
-            print(f"  THEN {out} = {coeffs}")
-
 def sugeno_yasukawa_pseudocode(
     data,
     inputs,
