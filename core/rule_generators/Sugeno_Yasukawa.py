@@ -272,9 +272,75 @@ def update_consequents_ls_wls(data, inputs, outputs, rules_dict, normalized_stre
 
 
 def update_antecedents(data, inputs, rules_dict, normalized_strengths, eps_sigma):
-    """TODO: Zaktualizuj część IF (np. centra i sigma) z ograniczeniem sigma >= eps_sigma."""
-    _ = (data, inputs, rules_dict, normalized_strengths, eps_sigma)
-    pass
+    def update_antecedents(data, inputs, rules_dict, normalized_strengths, eps_sigma):
+    """Aktualizuje parametry części IF (center, sigma) na podstawie wag reguł.
+
+    Implementacja używa znormalizowanych sił aktywacji jako wag i dla każdej
+    reguły wyznacza ważoną średnią (nowe center) oraz ważone odchylenie
+    standardowe (nowe sigma) dla każdej zmiennej wejściowej.
+
+    Parametr `eps_sigma` wymusza dolne ograniczenie na szerokość gaussów,
+    aby uniknąć zapadania się funkcji przynależności.
+    """
+    # Sprawdzamy, czy struktura wag ma wymagane pola z poprzedniego kroku pipeline'u
+    if "rule_ids" not in normalized_strengths or "normalized" not in normalized_strengths:
+        raise ValueError("normalized_strengths musi zawierać klucze 'rule_ids' i 'normalized'.")
+
+    # Pobieramy mapowanie reguł do kolumn oraz samą macierz wag (n_samples, n_rules)
+    rule_ids = normalized_strengths["rule_ids"]
+    w_norm = np.asarray(normalized_strengths["normalized"], dtype=float)
+
+    # Jeżeli nie ma reguł albo próbek, kończymy bez zmian
+    if len(rule_ids) == 0 or len(data) == 0:
+        return rules_dict
+
+    # Przygotowujemy macierz wejść do obliczeń wektorowych
+    x = data[inputs].to_numpy(dtype=float)
+
+    # Minimalna dopuszczalna sigma (zabezpieczenie przed zerem/ujemną wartością)
+    sigma_floor = max(float(eps_sigma), 1e-6)
+
+    # Dla każdej reguły aktualizujemy parametry antecedentu osobno dla każdego wejścia
+    for rule_col, rule_id in enumerate(rule_ids):
+        # Jeżeli reguła została wcześniej usunięta, pomijamy ją
+        if rule_id not in rules_dict:
+            continue
+
+        # Pobieramy wektor wag przypisanych do tej reguły dla wszystkich próbek
+        weights = np.clip(w_norm[:, rule_col], 0.0, None)
+        weight_sum = float(np.sum(weights))
+
+        # Jeżeli suma wag jest zbyt mała, nie aktualizujemy tej reguły
+        if weight_sum <= 1e-12:
+            continue
+
+        # Upewniamy się, że słownik antecedentu istnieje
+        antecedent = rules_dict[rule_id].setdefault("antecedent", {})
+
+        for input_idx, input_name in enumerate(inputs):
+            # Pobieramy wszystkie wartości danej zmiennej wejściowej
+            x_col = x[:, input_idx]
+
+            # Liczymy ważoną średnią -> nowe center
+            center_new = float(np.sum(weights * x_col) / weight_sum)
+
+            # Liczymy ważoną wariancję i sigma -> nowe rozmycie gaussa
+            variance_new = float(np.sum(weights * np.square(x_col - center_new)) / weight_sum)
+            sigma_new = float(np.sqrt(max(variance_new, 0.0)))
+
+            # Wymuszamy dolne ograniczenie sigma, by zachować stabilność obliczeń
+            sigma_new = max(sigma_new, sigma_floor)
+
+            # Aktualizujemy strukturę parametru antecedentu dla tej zmiennej
+            antecedent_entry = antecedent.setdefault(
+                input_name,
+                {"center": center_new, "sigma": sigma_new},
+            )
+            antecedent_entry["center"] = center_new
+            antecedent_entry["sigma"] = sigma_new
+
+    # Zwracamy zaktualizowane reguły (aktualizacja wykonana in-place)
+    return rules_dict
 
 
 def compute_objective_mse(data, inputs, outputs, rules_dict, fuzzy_sets, universes):
