@@ -72,7 +72,7 @@ print(f"Liczba aktywnych reguł NIT: {len(activated_nit)}")
 # ---------------------------------------------------------------------
 # Ustalamy podstawowe parametry testowego uruchomienia algorytmu.
 n_rules = 3
-eps_sigma = 0.1
+eps_sigma = 1.0
 
 # Inicjalizujemy klastry metodą c-means, aby uzyskać środki reguł startowych.
 centers, membership_matrix = sy.initialize_clusters_with_cmeans(
@@ -110,7 +110,8 @@ print(centers)
 print("\nMembership matrix z c-means:")
 print(membership_matrix)
 print("\nInitial rules:")
-print(sugeno_rules)
+#print(sugeno_rules)
+sy.print_rules(sugeno_rules)
 print("\nRaw strengths:")
 print(raw_strengths)
 print("\nZnormalizowane siły aktywacji:")
