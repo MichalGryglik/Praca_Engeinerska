@@ -342,13 +342,90 @@ def update_antecedents(data, inputs, rules_dict, normalized_strengths, eps_sigma
     return rules_dict
 
 
-def compute_objective_mse(data, inputs, outputs, rules_dict, fuzzy_sets, universes):
-    """TODO: Oblicz funkcję celu (MSE)."""
-    _ = (data, inputs, outputs, rules_dict, fuzzy_sets, universes)
-    pass
+def predict(data, inputs, outputs, rules_dict):
+    """Oblicza predykcje modelu Sugeno dla wszystkich próbek w zbiorze danych.
+
+    Parameters
+    ----------
+    data : pandas.DataFrame
+        Dane wejściowe.
+    inputs : list[str]
+        Nazwy zmiennych wejściowych.
+    outputs : list[str]
+        Nazwy zmiennych wyjściowych.
+    rules_dict : dict
+        Słownik reguł Sugeno zawierający parametry poprzedników i konsekwentów.
+
+    Returns
+    -------
+    dict[str, np.ndarray]
+        Słownik przewidywanych wartości: {output_name: np.ndarray}
+        Gdzie każdy array ma kształt (n_samples,).
+    """
+    # Jeżeli nie ma reguł, zwracamy zera
+    if not rules_dict:
+        n_samples = len(data)
+        return {output_name: np.zeros(n_samples, dtype=float) for output_name in outputs}
+
+    # Pobieramy dane wejściowe
+    x = data[inputs].to_numpy(dtype=float)
+    n_samples = x.shape[0]
+
+    # Inicjalizujemy słownik wyników
+    y_predictions = {output_name: np.zeros(n_samples, dtype=float) for output_name in outputs}
+
+    # Dla każdej próbki obliczamy prognozę
+    for sample_idx in range(n_samples):
+        x_sample = x[sample_idx]
+
+        # Dla każdego wyjścia
+        for output_name in outputs:
+            numerator = 0.0
+            denominator = 0.0
+
+            # Przetwarzamy wszystkie reguły
+            for rule_id, rule_data in rules_dict.items():
+                # Pobieramy parametry antecedentu
+                antecedent = rule_data.get("antecedent", {})
+
+                # Obliczamy siłę aktywacji tej reguły (iloczyn gaussów)
+                firing_strength = 1.0
+                for input_idx, input_name in enumerate(inputs):
+                    params = antecedent.get(input_name, {})
+                    center = float(params.get("center", 0.0))
+                    sigma = max(float(params.get("sigma", 1.0)), 1e-6)
+
+                    # Przynależność gaussowska
+                    z = (x_sample[input_idx] - center) / sigma
+                    mu = float(np.exp(-0.5 * np.square(z)))
+                    firing_strength *= mu
+
+                # Obliczamy wyjście tej reguły (liniowy model Sugeno)
+                consequent = rule_data.get("consequent", {})
+                if output_name in consequent:
+                    cons_data = consequent[output_name]
+                    coeffs = np.asarray(
+                        cons_data.get("coefficients", np.zeros(len(inputs) + 1))
+                    )
+
+                    # Budujemy rozszerzony wektor [1, x1, x2, ...]
+                    x_augmented = np.concatenate([[1.0], x_sample])
+                    y_rule = float(np.dot(coeffs, x_augmented))
+
+                    # Dodajemy wkład tej reguły (ważona średnia)
+                    numerator += firing_strength * y_rule
+                    denominator += firing_strength
+
+            # Obliczamy prognozę jako średnia ważona konsekwentów
+            if denominator > 1e-12:
+                y_predictions[output_name][sample_idx] = numerator / denominator
+            else:
+                y_predictions[output_name][sample_idx] = 0.0
+
+    return y_predictions
 
 
-def adapt_rule_structure(rules_dict, normalized_strengths, local_errors):
+"""def adapt_rule_structure(rules_dict, normalized_strengths, local_errors):
     """TODO: Adaptacja struktury reguł (usuń/dodaj/scal)."""
     _ = (rules_dict, normalized_strengths, local_errors)
     pass
@@ -357,7 +434,7 @@ def adapt_rule_structure(rules_dict, normalized_strengths, local_errors):
 def estimate_local_errors(data, inputs, outputs, rules_dict, fuzzy_sets, universes):
     """TODO: Wyznacz błędy lokalne na potrzeby adaptacji struktury."""
     _ = (data, inputs, outputs, rules_dict, fuzzy_sets, universes)
-    pass
+    pass"""
 
 
 def print_rules(rules_dict):
