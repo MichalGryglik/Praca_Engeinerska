@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """Szkielet metody Sugeno–Yasukawa z inicjalizacją klastrów przez scikit-fuzzy.
 
 Plik celowo zawiera funkcje-szkielety (TODO), które będą uzupełniane
@@ -425,7 +426,7 @@ def predict(data, inputs, outputs, rules_dict):
     return y_predictions
 
 
-"""def adapt_rule_structure(rules_dict, normalized_strengths, local_errors):
+def adapt_rule_structure(rules_dict, normalized_strengths, local_errors):
     """TODO: Adaptacja struktury reguł (usuń/dodaj/scal)."""
     _ = (rules_dict, normalized_strengths, local_errors)
     pass
@@ -434,7 +435,7 @@ def predict(data, inputs, outputs, rules_dict):
 def estimate_local_errors(data, inputs, outputs, rules_dict, fuzzy_sets, universes):
     """TODO: Wyznacz błędy lokalne na potrzeby adaptacji struktury."""
     _ = (data, inputs, outputs, rules_dict, fuzzy_sets, universes)
-    pass"""
+    pass
 
 
 def print_rules(rules_dict):
@@ -442,49 +443,8 @@ def print_rules(rules_dict):
         print(f"\nRule {rule_id}")
 
         for var, params in rule["antecedent"].items():
-            print(f"  IF {var} ≈ {params['center']:.2f} (σ={params['sigma']:.2f})")
+            print(f"  IF {var} approx {params['center']:.2f} (sigma={params['sigma']:.2f})")
 
         for out, cons in rule["consequent"].items():
             coeffs = cons["coefficients"]
             print(f"  THEN {out} = {coeffs}")
-
-def sugeno_yasukawa_pseudocode(
-    data,
-    inputs,
-    outputs,
-    fuzzy_sets,
-    universes,
-    n_rules,
-    eps_j,
-    eps_sigma,
-    max_iter,
-):
-    """Szkielet pętli uczenia metody Sugeno–Yasukawa."""
-    centers, _ = initialize_clusters_with_cmeans(data, inputs, n_rules)
-    rules_dict = build_initial_rules_from_clusters(centers, inputs, outputs, eps_sigma)
-
-    previous_error = float("inf")
-
-    for _iteration in range(1, max_iter + 1):
-        normalized_strengths = compute_normalized_firing_strengths(
-            data, inputs, rules_dict, fuzzy_sets, universes
-        )
-
-        update_consequents_ls_wls(data, inputs, outputs, rules_dict, normalized_strengths)
-        update_antecedents(data, inputs, rules_dict, normalized_strengths, eps_sigma)
-
-        current_error = compute_objective_mse(
-            data, inputs, outputs, rules_dict, fuzzy_sets, universes
-        )
-
-        local_errors = estimate_local_errors(
-            data, inputs, outputs, rules_dict, fuzzy_sets, universes
-        )
-        adapt_rule_structure(rules_dict, normalized_strengths, local_errors)
-
-        if abs(previous_error - current_error) < eps_j:
-            break
-
-        previous_error = current_error
-
-    return rules_dict
