@@ -111,3 +111,41 @@ def pretty_print_rules(rules, inputs):
             print(f"Rule {i}: IF {inputs_text} THEN y IS {y_label}")
 
     print("\n=== KONIEC LISTY REGUŁ ===\n")
+
+
+def predict(data, inputs, outputs, rules_dict, fuzzy_sets, universes):
+    """Oblicza predykcje modelu Wang–Mendel dla wszystkich próbek.
+
+    Parameters
+    ----------
+    data : pandas.DataFrame
+        Dane wejściowe.
+    inputs : list[str]
+        Nazwy zmiennych wejściowych.
+    outputs : list[str]
+        Nazwy zmiennych wyjściowych (obsługiwane jedno wyjście).
+    rules_dict : dict
+        Słownik reguł Wang–Mendel.
+    fuzzy_sets : dict
+        Zbiory rozmyte.
+    universes : dict
+        Uniwersa dla wszystkich zmiennych.
+
+    Returns
+    -------
+    dict[str, np.ndarray]
+        Słownik przewidywanych wartości: {output_name: np.ndarray}
+    """
+    output_name = outputs[0]
+    n_samples = len(data)
+    y_predictions = np.zeros(n_samples, dtype=float)
+
+    for idx, (_, row) in enumerate(data.iterrows()):
+        # Przygotowujemy wektor wejścia dla tej próbki
+        input_dict = {inp: row[inp] for inp in inputs}
+
+        # Obliczamy predykcję za pomocą istniejącej funkcji apply_rules
+        y_pred, _ = apply_rules(input_dict, rules_dict, fuzzy_sets, universes)
+        y_predictions[idx] = y_pred if not np.isnan(y_pred) else 0.0
+
+    return {output_name: y_predictions}

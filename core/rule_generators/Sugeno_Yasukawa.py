@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """Szkielet metody Sugeno–Yasukawa z inicjalizacją klastrów przez scikit-fuzzy.
 
 Plik celowo zawiera funkcje-szkielety (TODO), które będą uzupełniane
@@ -272,15 +273,157 @@ def update_consequents_ls_wls(data, inputs, outputs, rules_dict, normalized_stre
 
 
 def update_antecedents(data, inputs, rules_dict, normalized_strengths, eps_sigma):
-    """TODO: Zaktualizuj część IF (np. centra i sigma) z ograniczeniem sigma >= eps_sigma."""
-    _ = (data, inputs, rules_dict, normalized_strengths, eps_sigma)
-    pass
+    """Aktualizuje parametry części IF (center, sigma) na podstawie wag reguł.
+
+    Implementacja używa znormalizowanych sił aktywacji jako wag i dla każdej
+    reguły wyznacza ważoną średnią (nowe center) oraz ważone odchylenie
+    standardowe (nowe sigma) dla każdej zmiennej wejściowej.
+
+    Parametr `eps_sigma` wymusza dolne ograniczenie na szerokość gaussów,
+    aby uniknąć zapadania się funkcji przynależności.
+    """
+    # Sprawdzamy, czy struktura wag ma wymagane pola z poprzedniego kroku pipeline'u
+    if "rule_ids" not in normalized_strengths or "normalized" not in normalized_strengths:
+        raise ValueError("normalized_strengths musi zawierać klucze 'rule_ids' i 'normalized'.")
+
+    # Pobieramy mapowanie reguł do kolumn oraz samą macierz wag (n_samples, n_rules)
+    rule_ids = normalized_strengths["rule_ids"]
+    w_norm = np.asarray(normalized_strengths["normalized"], dtype=float)
+
+    # Jeżeli nie ma reguł albo próbek, kończymy bez zmian
+    if len(rule_ids) == 0 or len(data) == 0:
+        return rules_dict
+
+    # Przygotowujemy macierz wejść do obliczeń wektorowych
+    x = data[inputs].to_numpy(dtype=float)
+
+    # Minimalna dopuszczalna sigma (zabezpieczenie przed zerem/ujemną wartością)
+    sigma_floor = max(float(eps_sigma), 1e-6)
+
+    # Dla każdej reguły aktualizujemy parametry antecedentu osobno dla każdego wejścia
+    for rule_col, rule_id in enumerate(rule_ids):
+        # Jeżeli reguła została wcześniej usunięta, pomijamy ją
+        if rule_id not in rules_dict:
+            continue
+
+        # Pobieramy wektor wag przypisanych do tej reguły dla wszystkich próbek
+        weights = np.clip(w_norm[:, rule_col], 0.0, None)
+        weight_sum = float(np.sum(weights))
+
+        # Jeżeli suma wag jest zbyt mała, nie aktualizujemy tej reguły
+        if weight_sum <= 1e-12:
+            continue
+
+        # Upewniamy się, że słownik antecedentu istnieje
+        antecedent = rules_dict[rule_id].setdefault("antecedent", {})
+
+        for input_idx, input_name in enumerate(inputs):
+            # Pobieramy wszystkie wartości danej zmiennej wejściowej
+            x_col = x[:, input_idx]
+
+            # Liczymy ważoną średnią -> nowe center
+            center_new = float(np.sum(weights * x_col) / weight_sum)
+
+            # Liczymy ważoną wariancję i sigma -> nowe rozmycie gaussa
+            variance_new = float(np.sum(weights * np.square(x_col - center_new)) / weight_sum)
+            sigma_new = float(np.sqrt(max(variance_new, 0.0)))
+
+            # Wymuszamy dolne ograniczenie sigma, by zachować stabilność obliczeń
+            sigma_new = max(sigma_new, sigma_floor)
+
+            # Aktualizujemy strukturę parametru antecedentu dla tej zmiennej
+            antecedent_entry = antecedent.setdefault(
+                input_name,
+                {"center": center_new, "sigma": sigma_new},
+            )
+            antecedent_entry["center"] = center_new
+            antecedent_entry["sigma"] = sigma_new
+
+    # Zwracamy zaktualizowane reguły (aktualizacja wykonana in-place)
+    return rules_dict
 
 
-def compute_objective_mse(data, inputs, outputs, rules_dict, fuzzy_sets, universes):
-    """TODO: Oblicz funkcję celu (MSE)."""
-    _ = (data, inputs, outputs, rules_dict, fuzzy_sets, universes)
-    pass
+def predict(data, inputs, outputs, rules_dict):
+    """Oblicza predykcje modelu Sugeno dla wszystkich próbek w zbiorze danych.
+
+    Parameters
+    ----------
+    data : pandas.DataFrame
+        Dane wejściowe.
+    inputs : list[str]
+        Nazwy zmiennych wejściowych.
+    outputs : list[str]
+        Nazwy zmiennych wyjściowych.
+    rules_dict : dict
+        Słownik reguł Sugeno zawierający parametry poprzedników i konsekwentów.
+
+    Returns
+    -------
+    dict[str, np.ndarray]
+        Słownik przewidywanych wartości: {output_name: np.ndarray}
+        Gdzie każdy array ma kształt (n_samples,).
+    """
+    # Jeżeli nie ma reguł, zwracamy zera
+    if not rules_dict:
+        n_samples = len(data)
+        return {output_name: np.zeros(n_samples, dtype=float) for output_name in outputs}
+
+    # Pobieramy dane wejściowe
+    x = data[inputs].to_numpy(dtype=float)
+    n_samples = x.shape[0]
+
+    # Inicjalizujemy słownik wyników
+    y_predictions = {output_name: np.zeros(n_samples, dtype=float) for output_name in outputs}
+
+    # Dla każdej próbki obliczamy prognozę
+    for sample_idx in range(n_samples):
+        x_sample = x[sample_idx]
+
+        # Dla każdego wyjścia
+        for output_name in outputs:
+            numerator = 0.0
+            denominator = 0.0
+
+            # Przetwarzamy wszystkie reguły
+            for rule_id, rule_data in rules_dict.items():
+                # Pobieramy parametry antecedentu
+                antecedent = rule_data.get("antecedent", {})
+
+                # Obliczamy siłę aktywacji tej reguły (iloczyn gaussów)
+                firing_strength = 1.0
+                for input_idx, input_name in enumerate(inputs):
+                    params = antecedent.get(input_name, {})
+                    center = float(params.get("center", 0.0))
+                    sigma = max(float(params.get("sigma", 1.0)), 1e-6)
+
+                    # Przynależność gaussowska
+                    z = (x_sample[input_idx] - center) / sigma
+                    mu = float(np.exp(-0.5 * np.square(z)))
+                    firing_strength *= mu
+
+                # Obliczamy wyjście tej reguły (liniowy model Sugeno)
+                consequent = rule_data.get("consequent", {})
+                if output_name in consequent:
+                    cons_data = consequent[output_name]
+                    coeffs = np.asarray(
+                        cons_data.get("coefficients", np.zeros(len(inputs) + 1))
+                    )
+
+                    # Budujemy rozszerzony wektor [1, x1, x2, ...]
+                    x_augmented = np.concatenate([[1.0], x_sample])
+                    y_rule = float(np.dot(coeffs, x_augmented))
+
+                    # Dodajemy wkład tej reguły (ważona średnia)
+                    numerator += firing_strength * y_rule
+                    denominator += firing_strength
+
+            # Obliczamy prognozę jako średnia ważona konsekwentów
+            if denominator > 1e-12:
+                y_predictions[output_name][sample_idx] = numerator / denominator
+            else:
+                y_predictions[output_name][sample_idx] = 0.0
+
+    return y_predictions
 
 
 def adapt_rule_structure(rules_dict, normalized_strengths, local_errors):
@@ -300,49 +443,8 @@ def print_rules(rules_dict):
         print(f"\nRule {rule_id}")
 
         for var, params in rule["antecedent"].items():
-            print(f"  IF {var} ≈ {params['center']:.2f} (σ={params['sigma']:.2f})")
+            print(f"  IF {var} approx {params['center']:.2f} (sigma={params['sigma']:.2f})")
 
         for out, cons in rule["consequent"].items():
             coeffs = cons["coefficients"]
             print(f"  THEN {out} = {coeffs}")
-
-def sugeno_yasukawa_pseudocode(
-    data,
-    inputs,
-    outputs,
-    fuzzy_sets,
-    universes,
-    n_rules,
-    eps_j,
-    eps_sigma,
-    max_iter,
-):
-    """Szkielet pętli uczenia metody Sugeno–Yasukawa."""
-    centers, _ = initialize_clusters_with_cmeans(data, inputs, n_rules)
-    rules_dict = build_initial_rules_from_clusters(centers, inputs, outputs, eps_sigma)
-
-    previous_error = float("inf")
-
-    for _iteration in range(1, max_iter + 1):
-        normalized_strengths = compute_normalized_firing_strengths(
-            data, inputs, rules_dict, fuzzy_sets, universes
-        )
-
-        update_consequents_ls_wls(data, inputs, outputs, rules_dict, normalized_strengths)
-        update_antecedents(data, inputs, rules_dict, normalized_strengths, eps_sigma)
-
-        current_error = compute_objective_mse(
-            data, inputs, outputs, rules_dict, fuzzy_sets, universes
-        )
-
-        local_errors = estimate_local_errors(
-            data, inputs, outputs, rules_dict, fuzzy_sets, universes
-        )
-        adapt_rule_structure(rules_dict, normalized_strengths, local_errors)
-
-        if abs(previous_error - current_error) < eps_j:
-            break
-
-        previous_error = current_error
-
-    return rules_dict
