@@ -14,8 +14,27 @@ Lekki framework badawczy do budowy i testowania baz reguł rozmytych.
 3. **Różnice między metodami**:
    - Wang–Mendel buduje pojedynczy konsekwent z wagą dla danego antecedentu.
    - Nozaki–Ishibuchi–Tanaka tworzy rozmyty konsekwent (wektor udziałów etykiet wyjścia).
+   - Sugeno–Yasukawa wykorzystuje funkcje Sugeno w konsekwentach, co pozwala na modelowanie zależności liniowych lub wielomianowych w przestrzeni wyjść.
 
 ## Obecny stan repozytorium
-- `core/inference.py`, `core/utils.py`, `examples/example2_config.py`, `example3_config.py`, `example4_config.py` są placeholders (`pass`).
-- `core/rule_generators/Sugeno_Yasukawa.py` zawiera rozwijany szkic implementacji metody Sugeno–Yasukawa.
+- `core/inference.py`, `core/utils.py`, `examples/example3_config.py`, `examples/example4_config.py` są placeholderami (`pass`).
 - `Struktura.txt` to pomocniczy szkic katalogów; aktualny stan plików sprawdzaj przez `rg --files`.
+
+## Dane (dataset)
+Projekt wykorzystuje dane Tennessee Eastman Process (TEP).
+
+Źródło:
+- https://www.kaggle.com/datasets/afrniomelo/tep-csv
+
+Wymagane pliki:
+- `TEP_FaultFree_Training.csv`
+- `TEP_FaultFree_Testing.csv`
+
+### Instrukcja przygotowania
+1. Pobierz dane z Kaggle przy pomocy powyższego linku.
+2. Rozpakuj pliki `.csv`.
+3. Umieść je w katalogu:
+   - `data/example2_data/`
+
+> Uwaga: pliki datasetów nie są przechowywane w repozytorium ze względu na ich rozmiar.
+

@@ -166,8 +166,8 @@ def pretty_print_rules(rules, inputs, threshold=0.0):
 
 
 
-def apply_rules(inputs, rules_dict, fuzzy_sets, universes, output_var="y"):
-    # 1. Fuzyfikacja wejść
+def apply_rules(inputs, rules_dict, fuzzy_sets, universes, outputs):
+    output_var = outputs[0]
     memberships = {}
     for inp_name, inp_val in inputs.items():
         memberships[inp_name] = {
@@ -249,7 +249,7 @@ def predict(data, inputs, outputs, rules_dict, fuzzy_sets, universes):
         input_dict = {inp: row[inp] for inp in inputs}
 
         # Obliczamy predykcję za pomocą istniejącej funkcji apply_rules
-        y_pred, _ = apply_rules(input_dict, rules_dict, fuzzy_sets, universes, output_var=output_name)
+        y_pred, _ = apply_rules(input_dict, rules_dict, fuzzy_sets, universes, outputs)
         y_predictions[idx] = y_pred if not np.isnan(y_pred) else 0.0
 
     return {output_name: y_predictions}

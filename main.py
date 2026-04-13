@@ -6,7 +6,7 @@ from core.rule_generators import Sugeno_Yasukawa as sy
 from core.rule_generators import nozaki_ishibuchi_tanaka as nit
 from core.rule_generators import wang_mendel as wm
 from core.evaluation.metrics import compute_mse
-from examples import example1_config
+from examples import example1_config, example2_config
 
 
 print("Framework loaded and modules detected.")
@@ -44,6 +44,7 @@ y_pred_wm_single, activated_wm = wm.apply_rules(
     rules_dict=rules_dict,
     fuzzy_sets=example1_config.fuzzy_sets,
     universes=example1_config.universes,
+    outputs=example1_config.outputs,
 )
 print(f"  Przewidywana wartość y = {y_pred_wm_single:.3f} dla x1={inputs_values['x1']}, x2={inputs_values['x2']}")
 print("  Aktywne reguły:")
@@ -74,6 +75,7 @@ y_pred_nit_single, activated_nit = nit.apply_rules(
     rules_dict=nit_rules,
     fuzzy_sets=example1_config.fuzzy_sets,
     universes=example1_config.universes,
+    outputs=example1_config.outputs,
 )
 print(f"  Przewidywana wartość y = {y_pred_nit_single:.3f} dla x1={inputs_values['x1']}, x2={inputs_values['x2']}")
 print(f"  Liczba aktywnych reguł: {len(activated_nit)}")
@@ -173,6 +175,7 @@ y_pred_wm_single, _ = wm.apply_rules(
     rules_dict=rules_dict,
     fuzzy_sets=example1_config.fuzzy_sets,
     universes=example1_config.universes,
+    outputs=example1_config.outputs,
 )
 print(f"Predykcja dla x1={inputs_values['x1']}, x2={inputs_values['x2']}: y={y_pred_wm_single:.3f}")
 
@@ -197,6 +200,7 @@ y_pred_nit_single, _ = nit.apply_rules(
     rules_dict=nit_rules,
     fuzzy_sets=example1_config.fuzzy_sets,
     universes=example1_config.universes,
+    outputs=example1_config.outputs,
 )
 print(f"Predykcja dla x1={inputs_values['x1']}, x2={inputs_values['x2']}: y={y_pred_nit_single:.3f}")
 
@@ -314,5 +318,149 @@ print(f"  Oczekiwane: y ≈ 12.0")
 print(f"  Wang–Mendel:                   y = {y_pred_wm_single:.3f}")
 print(f"  Nozaki–Ishibuchi–Tanaka:       y = {y_pred_nit_single:.3f}")
 print(f"  Sugeno–Yasukawa:               y = {y_pred_sy_single_value:.3f}")
+
+print("\n" + "="*70 + "\n")
+
+# =====================================================================
+# EXAMPLE 2: TEP DATA
+# =====================================================================
+print("\n" + "="*70)
+print("EXAMPLE 2: TEP DATA")
+print("="*70)
+
+# Wczytanie danych treningowych: pierwsze 1000 próbek z TEP_FaultFree_Training.csv
+tep_train = pd.read_csv("data/example2_data/TEP_FaultFree_Training.csv").head(1000)
+raise FileNotFoundError("Dataset not found. See README.md -> Dane (dataset)")
+
+# Generowanie reguł dla każdej metody
+
+# Wang-Mendel
+rules_dict_tep = wm.generate_rules(
+    data=tep_train,
+    inputs=example2_config.inputs,
+    outputs=example2_config.outputs,
+    fuzzy_sets=example2_config.fuzzy_sets,
+    universes=example2_config.universes,
+)
+
+# Nozaki-Ishibuchi-Tanaka
+nit_rules_tep = nit.generate_rules(
+    data=tep_train,
+    inputs=example2_config.inputs,
+    outputs=example2_config.outputs,
+    fuzzy_sets=example2_config.fuzzy_sets,
+    universes=example2_config.universes,
+)
+
+# Sugeno-Yasukawa
+n_rules = 3
+eps_sigma = 1.0
+
+centers, membership_matrix = sy.initialize_clusters_with_cmeans(
+    data=tep_train,
+    inputs=example2_config.inputs,
+    n_rules=n_rules,
+)
+
+sugeno_rules_tep = sy.build_initial_rules_from_clusters(
+    centers=centers,
+    inputs=example2_config.inputs,
+    outputs=example2_config.outputs,
+    eps_sigma=eps_sigma,
+)
+
+normalized_strengths_result = sy.compute_normalized_firing_strengths(
+    data=tep_train,
+    inputs=example2_config.inputs,
+    rules_dict=sugeno_rules_tep,
+    fuzzy_sets=example2_config.fuzzy_sets,
+    universes=example2_config.universes,
+)
+
+sy.update_consequents_ls_wls(
+    data=tep_train,
+    inputs=example2_config.inputs,
+    outputs=example2_config.outputs,
+    rules_dict=sugeno_rules_tep,
+    normalized_strengths=normalized_strengths_result,
+)
+
+sy.update_antecedents(
+    data=tep_train,
+    inputs=example2_config.inputs,
+    rules_dict=sugeno_rules_tep,
+    normalized_strengths=normalized_strengths_result,
+    eps_sigma=eps_sigma,
+)
+
+# Teraz predykcje na nowych próbkach: pierwsze 3 z TEP_FaultFree_Testing.csv
+test_samples_tep = pd.read_csv("data/example2_data/TEP_FaultFree_Testing.csv").head(3)
+test_y_true_tep = test_samples_tep[example2_config.outputs[0]].to_numpy(dtype=float)
+
+print("\nPróbki testowe TEP:")
+for idx, row in test_samples_tep.iterrows():
+    print(f"  Próbka {idx+1}: xmeas_38={row['xmeas_38']:.3f}, xmeas_33={row['xmeas_33']:.3f}, xmeas_27={row['xmeas_27']:.3f} -> oczekiwane xmeas_1={row['xmeas_1']:.3f}")
+
+print("\n" + "-"*70)
+print("PREDYKCJE NA NOWYCH PRÓBKACH TEP:")
+print("-"*70)
+
+# Wang-Mendel
+y_pred_wm_tep = wm.predict(
+    data=test_samples_tep,
+    inputs=example2_config.inputs,
+    outputs=example2_config.outputs,
+    rules_dict=rules_dict_tep,
+    fuzzy_sets=example2_config.fuzzy_sets,
+    universes=example2_config.universes
+)
+y_pred_wm_tep_values = y_pred_wm_tep[example2_config.outputs[0]]
+mse_wm_tep = compute_mse(test_y_true_tep, y_pred_wm_tep_values)
+
+print("\nWang-Mendel:")
+for idx, (y_true, y_pred) in enumerate(zip(test_y_true_tep, y_pred_wm_tep_values)):
+    print(f"  Próbka {idx+1}: oczekiwane={y_true:.3f}, predykcja={y_pred:.3f}, błąd={abs(y_true-y_pred):.3f}")
+print(f"  MSE na testach: {mse_wm_tep:.6f}")
+
+# Nozaki-Ishibuchi-Tanaka
+y_pred_nit_tep = nit.predict(
+    data=test_samples_tep,
+    inputs=example2_config.inputs,
+    outputs=example2_config.outputs,
+    rules_dict=nit_rules_tep,
+    fuzzy_sets=example2_config.fuzzy_sets,
+    universes=example2_config.universes
+)
+y_pred_nit_tep_values = y_pred_nit_tep[example2_config.outputs[0]]
+mse_nit_tep = compute_mse(test_y_true_tep, y_pred_nit_tep_values)
+
+print("\nNozaki-Ishibuchi-Tanaka:")
+for idx, (y_true, y_pred) in enumerate(zip(test_y_true_tep, y_pred_nit_tep_values)):
+    print(f"  Próbka {idx+1}: oczekiwane={y_true:.3f}, predykcja={y_pred:.3f}, błąd={abs(y_true-y_pred):.3f}")
+print(f"  MSE na testach: {mse_nit_tep:.6f}")
+
+# Sugeno-Yasukawa
+y_pred_sy_tep = sy.predict(
+    data=test_samples_tep,
+    inputs=example2_config.inputs,
+    outputs=example2_config.outputs,
+    rules_dict=sugeno_rules_tep
+)
+y_pred_sy_tep_values = y_pred_sy_tep[example2_config.outputs[0]]
+mse_sy_tep = compute_mse(test_y_true_tep, y_pred_sy_tep_values)
+
+print("\nSugeno-Yasukawa:")
+for idx, (y_true, y_pred) in enumerate(zip(test_y_true_tep, y_pred_sy_tep_values)):
+    print(f"  Próbka {idx+1}: oczekiwane={y_true:.3f}, predykcja={y_pred:.3f}, błąd={abs(y_true-y_pred):.3f}")
+print(f"  MSE na testach: {mse_sy_tep:.6f}")
+
+# --- Podsumowanie TEP ---
+print("\n" + "="*70)
+print("PODSUMOWANIE TEP")
+print("="*70)
+print(f"\nMSE dla każdej metody na próbkach testowych TEP:")
+print(f"  Wang–Mendel:                   {mse_wm_tep:.6f}")
+print(f"  Nozaki–Ishibuchi–Tanaka:       {mse_nit_tep:.6f}")
+print(f"  Sugeno–Yasukawa:               {mse_sy_tep:.6f}")
 
 print("\n" + "="*70 + "\n")
