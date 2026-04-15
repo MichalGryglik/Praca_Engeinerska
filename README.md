@@ -6,7 +6,8 @@ Lekki framework badawczy do budowy i testowania baz reguł rozmytych.
 - `main.py` uruchamia pełny przepływ dla przykładowego zestawu danych: wczytuje CSV, buduje reguły Wang–Mendel i Nozaki–Ishibuchi–Tanaka, a następnie wykonuje wnioskowanie.
 - `core/membership_functions.py` zawiera podstawy fuzyfikacji (tworzenie funkcji przynależności i wybór najlepszego zbioru dla wartości).
 - `core/rule_generators/` zawiera implementacje metod generowania i użycia reguł.
-- `examples/example1_config.py` definiuje uniwersa, zbiory i konfigurację wejść/wyjść dla przykładu 1.
+- `experiments/example_config.py` definiuje uniwersa, zbiory i konfigurację wejść/wyjść dla przykładu 1.
+- `data/data_config.py` definiuje konfigurację wejść/wyjść dla danych TEP.
 
 ## Co warto zrozumieć na początku
 1. **Przepływ danych**: dane wejściowe -> fuzyfikacja -> aktywacja reguł -> agregacja -> defuzyfikacja.
@@ -17,7 +18,7 @@ Lekki framework badawczy do budowy i testowania baz reguł rozmytych.
    - Sugeno–Yasukawa wykorzystuje funkcje Sugeno w konsekwentach, co pozwala na modelowanie zależności liniowych lub wielomianowych w przestrzeni wyjść.
 
 ## Obecny stan repozytorium
-- `core/inference.py`, `core/utils.py`, `examples/example3_config.py`, `examples/example4_config.py` są placeholderami (`pass`).
+- `core/inference.py` i `core/utils.py` są placeholderami (`pass`).
 - `Struktura.txt` to pomocniczy szkic katalogów; aktualny stan plików sprawdzaj przez `rg --files`.
 
 ## Dane (dataset)
@@ -34,7 +35,7 @@ Wymagane pliki:
 1. Pobierz dane z Kaggle przy pomocy powyższego linku.
 2. Rozpakuj pliki `.csv`.
 3. Umieść je w katalogu:
-   - `data/example2_data/`
+   - `data/`
 
 > Uwaga: pliki datasetów nie są przechowywane w repozytorium ze względu na ich rozmiar.
 

@@ -1,7 +1,7 @@
 import pandas as pd
 
 # === 1. Wczytanie danych ===
-tep_data = pd.read_csv("data/example2_data/TEP_FaultFree_Testing.csv")
+tep_data = pd.read_csv("data/TEP_FaultFree_Testing.csv")
 
 print("Pierwsze 4 wiersze:")
 print(tep_data.head(4).to_string())

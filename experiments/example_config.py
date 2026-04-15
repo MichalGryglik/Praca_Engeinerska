@@ -1,4 +1,4 @@
-# examples/example1_config.py
+# experiments/example_config.py
 # Konfiguracja zestawu 1
 import numpy as np
 from core.membership_functions import create_sets
