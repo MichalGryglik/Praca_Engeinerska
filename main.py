@@ -4,7 +4,6 @@ from experiments.tep_experiment import run as run_tep_experiment
 
 def main():
     print("Framework loaded and modules detected.")
-    run_example_experiment()
     run_tep_experiment()
 
 
