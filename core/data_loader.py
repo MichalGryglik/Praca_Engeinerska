@@ -1,4 +1,4 @@
-# data/data_config.py
+# core/data_loader.py
 # Konfiguracja zestawu 2
 import numpy as np
 import pandas as pd
@@ -6,7 +6,7 @@ import os
 from core.membership_functions import create_sets
 
 # Wczytanie danych do obliczenia min/max
-data_path = os.path.join(os.path.dirname(__file__), "TEP_FaultFree_Testing.csv")
+data_path = os.path.join(os.path.dirname(__file__), "../data/TEP_FaultFree_Testing.csv")
 tep_data = pd.read_csv(data_path)
 
 # Obliczenie min/max dla każdej zmiennej

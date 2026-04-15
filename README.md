@@ -3,11 +3,13 @@
 Lekki framework badawczy do budowy i testowania baz reguł rozmytych.
 
 ## Szybki obraz projektu
-- `main.py` uruchamia pełny przepływ dla przykładowego zestawu danych: wczytuje CSV, buduje reguły Wang–Mendel i Nozaki–Ishibuchi–Tanaka, a następnie wykonuje wnioskowanie.
+- `main.py` jest lekkim punktem wejścia, który uruchamia oba eksperymenty.
+- `experiments/example_experiment.py` uruchamia eksperyment na prostym zbiorze przykładowym.
+- `experiments/tep_experiment.py` uruchamia eksperyment na danych TEP.
 - `core/membership_functions.py` zawiera podstawy fuzyfikacji (tworzenie funkcji przynależności i wybór najlepszego zbioru dla wartości).
 - `core/rule_generators/` zawiera implementacje metod generowania i użycia reguł.
-- `experiments/example_config.py` definiuje uniwersa, zbiory i konfigurację wejść/wyjść dla przykładu 1.
-- `data/data_config.py` definiuje konfigurację wejść/wyjść dla danych TEP.
+- `sandbox/example_config.py` definiuje uniwersa, zbiory i konfigurację wejść/wyjść dla przykładu 1.
+- `core/data_loader.py` definiuje konfigurację wejść/wyjść dla danych TEP.
 
 ## Co warto zrozumieć na początku
 1. **Przepływ danych**: dane wejściowe -> fuzyfikacja -> aktywacja reguł -> agregacja -> defuzyfikacja.
