@@ -3,10 +3,13 @@
 Lekki framework badawczy do budowy i testowania baz reguł rozmytych.
 
 ## Szybki obraz projektu
-- `main.py` uruchamia pełny przepływ dla przykładowego zestawu danych: wczytuje CSV, buduje reguły Wang–Mendel i Nozaki–Ishibuchi–Tanaka, a następnie wykonuje wnioskowanie.
+- `main.py` jest lekkim punktem wejścia, który uruchamia oba eksperymenty.
+- `experiments/example_experiment.py` uruchamia eksperyment na prostym zbiorze przykładowym.
+- `experiments/tep_experiment.py` uruchamia eksperyment na danych TEP.
 - `core/membership_functions.py` zawiera podstawy fuzyfikacji (tworzenie funkcji przynależności i wybór najlepszego zbioru dla wartości).
 - `core/rule_generators/` zawiera implementacje metod generowania i użycia reguł.
-- `examples/example1_config.py` definiuje uniwersa, zbiory i konfigurację wejść/wyjść dla przykładu 1.
+- `sandbox/example_config.py` definiuje uniwersa, zbiory i konfigurację wejść/wyjść dla przykładu 1.
+- `core/data_loader.py` definiuje konfigurację wejść/wyjść dla danych TEP.
 
 ## Co warto zrozumieć na początku
 1. **Przepływ danych**: dane wejściowe -> fuzyfikacja -> aktywacja reguł -> agregacja -> defuzyfikacja.
@@ -14,8 +17,27 @@ Lekki framework badawczy do budowy i testowania baz reguł rozmytych.
 3. **Różnice między metodami**:
    - Wang–Mendel buduje pojedynczy konsekwent z wagą dla danego antecedentu.
    - Nozaki–Ishibuchi–Tanaka tworzy rozmyty konsekwent (wektor udziałów etykiet wyjścia).
+   - Sugeno–Yasukawa wykorzystuje funkcje Sugeno w konsekwentach, co pozwala na modelowanie zależności liniowych lub wielomianowych w przestrzeni wyjść.
 
 ## Obecny stan repozytorium
-- `core/inference.py`, `core/utils.py`, `examples/example2_config.py`, `example3_config.py`, `example4_config.py` są placeholders (`pass`).
-- `core/rule_generators/Sugeno_Yasukawa.py` zawiera rozwijany szkic implementacji metody Sugeno–Yasukawa.
+- `core/inference.py` i `core/utils.py` są placeholderami (`pass`).
 - `Struktura.txt` to pomocniczy szkic katalogów; aktualny stan plików sprawdzaj przez `rg --files`.
+
+## Dane (dataset)
+Projekt wykorzystuje dane Tennessee Eastman Process (TEP).
+
+Źródło:
+- https://www.kaggle.com/datasets/afrniomelo/tep-csv
+
+Wymagane pliki:
+- `TEP_FaultFree_Training.csv`
+- `TEP_FaultFree_Testing.csv`
+
+### Instrukcja przygotowania
+1. Pobierz dane z Kaggle przy pomocy powyższego linku.
+2. Rozpakuj pliki `.csv`.
+3. Umieść je w katalogu:
+   - `data/`
+
+> Uwaga: pliki datasetów nie są przechowywane w repozytorium ze względu na ich rozmiar.
+

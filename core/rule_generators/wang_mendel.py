@@ -31,12 +31,13 @@ def generate_rules(data, inputs, outputs, fuzzy_sets, universes):
     return rules_dict
 
 
-def apply_rules(inputs, rules_dict, fuzzy_sets, universes):
+def apply_rules(inputs, rules_dict, fuzzy_sets, universes, outputs):
     """
     inputs: dict, np. {"x1": 7.0, "x2": 6.0}
     rules_dict: wygenerowane reguły Wang-Mendel
     fuzzy_sets: wszystkie zbiory rozmyte w formie {'x1': {...}, 'x2': {...}, 'y': {...}}
     universes: uniwersa dla wszystkich zmiennych {'x1': ..., 'x2': ..., 'y': ...}
+    outputs: lista wyjść
 
     Zwraca:
         y_pred: przewidywana wartość wyjścia
@@ -69,7 +70,7 @@ def apply_rules(inputs, rules_dict, fuzzy_sets, universes):
         numerator = 0
         denominator = 0
         for y_label, w in activated:
-            centroid = fuzz.defuzz(universes['y'], fuzzy_sets['y'][y_label], 'centroid')
+            centroid = fuzz.defuzz(universes[outputs[0]], fuzzy_sets[outputs[0]][y_label], 'centroid')
             numerator += w * centroid
             denominator += w
         y_pred = numerator / denominator
@@ -145,7 +146,7 @@ def predict(data, inputs, outputs, rules_dict, fuzzy_sets, universes):
         input_dict = {inp: row[inp] for inp in inputs}
 
         # Obliczamy predykcję za pomocą istniejącej funkcji apply_rules
-        y_pred, _ = apply_rules(input_dict, rules_dict, fuzzy_sets, universes)
+        y_pred, _ = apply_rules(input_dict, rules_dict, fuzzy_sets, universes, outputs)
         y_predictions[idx] = y_pred if not np.isnan(y_pred) else 0.0
 
     return {output_name: y_predictions}
