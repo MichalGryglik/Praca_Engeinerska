@@ -46,12 +46,57 @@ def run():
         sy_params={"n_rules": 3, "eps_sigma": 1.0},
     )
 
-    wm_model = train_wm(tep_train, config)
-    nit_model = train_nit(tep_train, config)
-    sy_model = train_sy(tep_train, config)
+    (
+        wm_model,
+        wm_training_time,
+        wm_rule_creation_time,
+        wm_structure_time,
+        wm_learning_time,
+    ) = train_wm(tep_train, config)
+    (
+        nit_model,
+        nit_training_time,
+        nit_rule_creation_time,
+        nit_structure_time,
+        nit_learning_time,
+    ) = train_nit(tep_train, config)
+    (
+        sy_model,
+        sy_training_time,
+        sy_rule_creation_time,
+        sy_structure_time,
+        sy_learning_time,
+    ) = train_sy(tep_train, config)
 
-    wm_results = evaluate_model(wm_model, "wm", tep_test, config)
-    nit_results = evaluate_model(nit_model, "nit", tep_test, config)
-    sy_results = evaluate_model(sy_model, "sy", tep_test, config)
+    wm_results = evaluate_model(
+        wm_model,
+        "wm",
+        tep_test,
+        config,
+        training_time_seconds=wm_training_time,
+        rule_creation_time_seconds=wm_rule_creation_time,
+        structure_time_seconds=wm_structure_time,
+        learning_time_seconds=wm_learning_time,
+    )
+    nit_results = evaluate_model(
+        nit_model,
+        "nit",
+        tep_test,
+        config,
+        training_time_seconds=nit_training_time,
+        rule_creation_time_seconds=nit_rule_creation_time,
+        structure_time_seconds=nit_structure_time,
+        learning_time_seconds=nit_learning_time,
+    )
+    sy_results = evaluate_model(
+        sy_model,
+        "sy",
+        tep_test,
+        config,
+        training_time_seconds=sy_training_time,
+        rule_creation_time_seconds=sy_rule_creation_time,
+        structure_time_seconds=sy_structure_time,
+        learning_time_seconds=sy_learning_time,
+    )
 
     print_summary(wm_results, nit_results, sy_results)

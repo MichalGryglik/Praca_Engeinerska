@@ -5,6 +5,7 @@ import pandas as pd
 from core.data_loader import load_csv_dataset
 from core.experiment_runner import (
     ExperimentConfig,
+    _print_results_table,
     evaluate_model,
     print_model_results,
     print_sample_preview,
@@ -94,9 +95,8 @@ def print_single_prediction_sy(model, config: ExperimentConfig, inputs_values: d
 
 
 def print_train_metrics(*results) -> None:
-    print("\nMSE dla kazdej metody na calym zbiorze danych:")
-    for result in results:
-        print(f"  {result.name.upper():<30} {result.mse:.6f}")
+    print("\nMetryki dla kazdej metody na calym zbiorze danych:")
+    _print_results_table(*results)
 
 
 def run():
@@ -114,7 +114,13 @@ def run():
     print("METODA 1: WANG-MENDEL")
     print("=" * 70)
 
-    wm_model = train_wm(train_data, config)
+    (
+        wm_model,
+        wm_training_time,
+        wm_rule_creation_time,
+        wm_structure_time,
+        wm_learning_time,
+    ) = train_wm(train_data, config)
 
     print("\nReguly Wang-Mendel:")
     wm.pretty_print_rules(wm_model, config.inputs)
@@ -124,7 +130,13 @@ def run():
     print("METODA 2: NOZAKI-ISHIBUCHI-TANAKA")
     print("=" * 70)
 
-    nit_model = train_nit(train_data, config)
+    (
+        nit_model,
+        nit_training_time,
+        nit_rule_creation_time,
+        nit_structure_time,
+        nit_learning_time,
+    ) = train_nit(train_data, config)
 
     print("\nReguly Nozaki-Ishibuchi-Tanaka:")
     nit.pretty_print_rules(nit_model, config.inputs)
@@ -134,19 +146,52 @@ def run():
     print("METODA 3: SUGENO-YASUKAWA")
     print("=" * 70)
 
-    sy_model = train_sy(train_data, config)
+    (
+        sy_model,
+        sy_training_time,
+        sy_rule_creation_time,
+        sy_structure_time,
+        sy_learning_time,
+    ) = train_sy(train_data, config)
 
     print("\nReguly poczatkowe Sugeno-Yasukawa:")
     sy.print_rules(sy_model)
     print_single_prediction_sy(sy_model, config, spec.inputs_values)
 
     print("\n\n" + "=" * 70)
-    print("CZESC 4: POROWNANIE PREDYKCJI I MSE")
+    print("CZESC 4: POROWNANIE PREDYKCJI I METRYK")
     print("=" * 70)
 
-    wm_train_results = evaluate_model(wm_model, "wm", train_data, config)
-    nit_train_results = evaluate_model(nit_model, "nit", train_data, config)
-    sy_train_results = evaluate_model(sy_model, "sy", train_data, config)
+    wm_train_results = evaluate_model(
+        wm_model,
+        "wm",
+        train_data,
+        config,
+        training_time_seconds=wm_training_time,
+        rule_creation_time_seconds=wm_rule_creation_time,
+        structure_time_seconds=wm_structure_time,
+        learning_time_seconds=wm_learning_time,
+    )
+    nit_train_results = evaluate_model(
+        nit_model,
+        "nit",
+        train_data,
+        config,
+        training_time_seconds=nit_training_time,
+        rule_creation_time_seconds=nit_rule_creation_time,
+        structure_time_seconds=nit_structure_time,
+        learning_time_seconds=nit_learning_time,
+    )
+    sy_train_results = evaluate_model(
+        sy_model,
+        "sy",
+        train_data,
+        config,
+        training_time_seconds=sy_training_time,
+        rule_creation_time_seconds=sy_rule_creation_time,
+        structure_time_seconds=sy_structure_time,
+        learning_time_seconds=sy_learning_time,
+    )
     print_train_metrics(wm_train_results, nit_train_results, sy_train_results)
 
     print("\n\n" + "=" * 70)
@@ -160,9 +205,36 @@ def run():
     print("PREDYKCJE NA NOWYCH PROBKACH:")
     print("-" * 70)
 
-    wm_test_results = evaluate_model(wm_model, "wm", test_data, config)
-    nit_test_results = evaluate_model(nit_model, "nit", test_data, config)
-    sy_test_results = evaluate_model(sy_model, "sy", test_data, config)
+    wm_test_results = evaluate_model(
+        wm_model,
+        "wm",
+        test_data,
+        config,
+        training_time_seconds=wm_training_time,
+        rule_creation_time_seconds=wm_rule_creation_time,
+        structure_time_seconds=wm_structure_time,
+        learning_time_seconds=wm_learning_time,
+    )
+    nit_test_results = evaluate_model(
+        nit_model,
+        "nit",
+        test_data,
+        config,
+        training_time_seconds=nit_training_time,
+        rule_creation_time_seconds=nit_rule_creation_time,
+        structure_time_seconds=nit_structure_time,
+        learning_time_seconds=nit_learning_time,
+    )
+    sy_test_results = evaluate_model(
+        sy_model,
+        "sy",
+        test_data,
+        config,
+        training_time_seconds=sy_training_time,
+        rule_creation_time_seconds=sy_rule_creation_time,
+        structure_time_seconds=sy_structure_time,
+        learning_time_seconds=sy_learning_time,
+    )
     print_model_results(wm_test_results, config)
     print_model_results(nit_test_results, config)
     print_model_results(sy_test_results, config)
