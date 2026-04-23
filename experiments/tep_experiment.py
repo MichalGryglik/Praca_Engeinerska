@@ -7,13 +7,17 @@ from core.experiment_runner import (
     train_sy,
     train_wm,
 )
+from core.results_writer import save_metrics_summary
+from core.scenarios import (
+    ScenarioConfig,
+    apply_training_scenario,
+    prepare_numeric_training_data,
+    print_scenario_summary,
+)
 
 
-def run():
-    print("\n" + "=" * 70)
-    print("EXAMPLE 2: TEP DATA")
-    print("=" * 70)
-
+def run(scenario: ScenarioConfig | None = None, seed: int = 42):
+    scenario = scenario or ScenarioConfig()
     run_config = {
         "sample_size": 1000,
         "test_sample_size": 1000,
@@ -29,7 +33,21 @@ def run():
 
     tep_train = load_tep_train(n_samples=run_config["sample_size"])
     tep_test = load_tep_test(n_samples=run_config["test_sample_size"])
-    spec_data = tep_train[inputs + outputs]
+    scenario_columns = inputs + outputs
+    tep_train = tep_train.copy()
+    tep_train[scenario_columns] = apply_training_scenario(
+        data=tep_train[scenario_columns],
+        scenario=scenario,
+        seed=seed,
+        gaussian_noise_columns=outputs,
+        missing_columns=scenario_columns,
+        outlier_columns=outputs,
+    )
+    tep_train[scenario_columns] = prepare_numeric_training_data(
+        tep_train[scenario_columns],
+        columns=scenario_columns,
+    )
+    spec_data = tep_train[scenario_columns]
     tep_spec = build_dataset_spec_from_data(
         data=spec_data,
         inputs=inputs,
@@ -44,6 +62,14 @@ def run():
         universes=tep_spec.universes,
         sample_size=run_config["sample_size"],
         sy_params={"n_rules": 3, "eps_sigma": 1.0},
+    )
+
+    print_scenario_summary(
+        title="EKSPERYMENT: Tennessee Eastman Process",
+        scenario=scenario,
+        sample_size=run_config["sample_size"],
+        missing_columns=scenario_columns,
+        outlier_columns=outputs,
     )
 
     (
@@ -100,3 +126,8 @@ def run():
     )
 
     print_summary(wm_results, nit_results, sy_results)
+    metrics_path = save_metrics_summary(
+        "tep",
+        [wm_results, nit_results, sy_results],
+    )
+    print(f"Zapisano metryki: {metrics_path}")

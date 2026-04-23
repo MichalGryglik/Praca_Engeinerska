@@ -14,6 +14,12 @@ from core.experiment_runner import (
     train_sy,
     train_wm,
 )
+from core.scenarios import (
+    ScenarioConfig,
+    apply_training_scenario,
+    prepare_numeric_training_data,
+    print_scenario_summary,
+)
 from core.rule_generators import nozaki_ishibuchi_tanaka as nit
 from core.rule_generators import sugeno_yasukawa as sy
 from core.rule_generators import wang_mendel as wm
@@ -99,15 +105,38 @@ def print_train_metrics(*results) -> None:
     _print_results_table(*results)
 
 
-def run():
+def run(scenario: ScenarioConfig | None = None, seed: int = 42):
+    scenario = scenario or ScenarioConfig()
     spec = build_example_spec()
     train_data = load_csv_dataset(spec.train_path, sep=";")
+    scenario_columns = example_config.inputs + example_config.outputs
+    train_data = train_data.copy()
+    train_data[scenario_columns] = apply_training_scenario(
+        data=train_data[scenario_columns],
+        scenario=scenario,
+        seed=seed,
+        gaussian_noise_columns=example_config.outputs,
+        missing_columns=scenario_columns,
+        outlier_columns=example_config.outputs,
+    )
+    train_data[scenario_columns] = prepare_numeric_training_data(
+        train_data[scenario_columns],
+        columns=scenario_columns,
+    )
     config = ExperimentConfig(
         inputs=example_config.inputs,
         outputs=example_config.outputs,
         fuzzy_sets=example_config.fuzzy_sets,
         universes=example_config.universes,
         sy_params={"n_rules": 3, "eps_sigma": 1.0},
+    )
+
+    print_scenario_summary(
+        title="EKSPERYMENT: Przykladowy zbior danych",
+        scenario=scenario,
+        sample_size=len(train_data),
+        missing_columns=scenario_columns,
+        outlier_columns=example_config.outputs,
     )
 
     print("\n" + "=" * 70)
