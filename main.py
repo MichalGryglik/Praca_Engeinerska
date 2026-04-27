@@ -4,7 +4,7 @@ from experiments.tep_experiment import run as run_tep_experiment
 
 
 def main():
-    run_sine_process_experiment()
+    run_tep_experiment()
 
 
 if __name__ == "__main__":

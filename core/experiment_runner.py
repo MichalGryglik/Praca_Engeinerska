@@ -145,11 +145,18 @@ def train_sy(
         sy_params = config.merged_sy_params()
         structure_start_time = perf_counter()
 
-        centers, _ = sy.initialize_clusters_with_cmeans(
+        centers, membership_matrix = sy.initialize_clusters_with_cmeans(
             data=train_data,
             inputs=config.inputs,
             n_rules=sy_params["n_rules"],
             m=sy_params["m"],
+        )
+        sigmas = sy.estimate_cluster_sigmas(
+            data=train_data,
+            inputs=config.inputs,
+            membership_matrix=membership_matrix,
+            m=sy_params["m"],
+            eps_sigma=sy_params["eps_sigma"],
         )
 
         rules_dict = sy.build_initial_rules_from_clusters(
@@ -157,6 +164,7 @@ def train_sy(
             inputs=config.inputs,
             outputs=config.outputs,
             eps_sigma=sy_params["eps_sigma"],
+            sigmas=sigmas,
         )
         nonlocal rule_creation_time_seconds, structure_time_seconds
         rule_creation_time_seconds = perf_counter() - structure_start_time
