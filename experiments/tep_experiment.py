@@ -2,6 +2,7 @@ from core.data_loader import build_dataset_spec_from_data, load_tep_test, load_t
 from core.experiment_runner import (
     ExperimentConfig,
     evaluate_model,
+    plot_predictions_vs_true,
     print_summary,
     train_nit,
     train_sy,
@@ -61,6 +62,7 @@ def run(scenario: ScenarioConfig | None = None, seed: int = 42):
         fuzzy_sets=tep_spec.fuzzy_sets,
         universes=tep_spec.universes,
         sample_size=run_config["sample_size"],
+        nit_params={"alpha": 1.0},
         sy_params={"n_rules": 3, "eps_sigma": 1.0},
     )
 
@@ -126,6 +128,12 @@ def run(scenario: ScenarioConfig | None = None, seed: int = 42):
     )
 
     print_summary(wm_results, nit_results, sy_results)
+    plot_predictions_vs_true(
+        wm_results,
+        nit_results,
+        sy_results,
+        title="Tennessee Eastman Process: y_pred vs y_true",
+    )
     metrics_path = save_metrics_summary(
         "tep",
         [wm_results, nit_results, sy_results],

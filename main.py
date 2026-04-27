@@ -1,8 +1,9 @@
 from experiments.sine_process_experiment import run as run_sine_process_experiment
+from experiments.example_experiment import run as run_example_experiment
+from experiments.tep_experiment import run as run_tep_experiment
 
 
 def main():
-    print("Framework loaded and modules detected.")
     run_sine_process_experiment()
 
 

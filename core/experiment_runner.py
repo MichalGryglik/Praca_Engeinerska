@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import sys
 from dataclasses import dataclass
+from pathlib import Path
 from time import perf_counter
 from typing import Any
 
@@ -29,7 +30,12 @@ from core.rule_generators import wang_mendel as wm
 
 DEFAULT_SY_PARAMS = {
     "n_rules": 3,
+    "m": 2.0,
     "eps_sigma": 1.0,
+}
+
+DEFAULT_NIT_PARAMS = {
+    "alpha": 1.0,
 }
 
 
@@ -43,7 +49,14 @@ class ExperimentConfig:
     universes: dict[str, Any]
     sample_size: int | None = None
     fault: int | None = None
+    nit_params: dict[str, Any] | None = None
     sy_params: dict[str, Any] | None = None
+
+    def merged_nit_params(self) -> dict[str, Any]:
+        params = DEFAULT_NIT_PARAMS.copy()
+        if self.nit_params:
+            params.update(self.nit_params)
+        return params
 
     def merged_sy_params(self) -> dict[str, Any]:
         params = DEFAULT_SY_PARAMS.copy()
@@ -104,6 +117,7 @@ def train_nit(
     train_data: pd.DataFrame, config: ExperimentConfig
 ) -> tuple[dict[str, Any], float, float, float, float]:
     """Trenuje model Nozaki-Ishibuchi-Tanaka."""
+    nit_params = config.merged_nit_params()
     model, training_time_seconds = _measure_training_time(
         lambda: nit.generate_rules(
             data=train_data,
@@ -111,6 +125,7 @@ def train_nit(
             outputs=config.outputs,
             fuzzy_sets=config.fuzzy_sets,
             universes=config.universes,
+            alpha=nit_params["alpha"],
         )
     )
     return (
@@ -134,6 +149,7 @@ def train_sy(
             data=train_data,
             inputs=config.inputs,
             n_rules=sy_params["n_rules"],
+            m=sy_params["m"],
         )
 
         rules_dict = sy.build_initial_rules_from_clusters(
@@ -342,3 +358,77 @@ def print_summary(*results: ModelResult) -> None:
     print("\nMetryki dla kazdej metody:")
     _print_results_table(*results)
     print("\n" + "=" * 70 + "\n")
+
+
+def plot_predictions_vs_true(
+    *results: ModelResult,
+    title: str = "Predykcje modeli: y_pred vs y_true",
+    output_path: str | Path | None = None,
+) -> None:
+    """Wyswietla i opcjonalnie zapisuje wykres y_pred wzgledem y_true."""
+    if not results:
+        return
+
+    matplotlib_config_dir = os.path.join(
+        os.getcwd(),
+        "results",
+        ".matplotlib",
+        str(os.getpid()),
+    )
+    os.makedirs(matplotlib_config_dir, exist_ok=True)
+    os.environ.setdefault("MPLCONFIGDIR", matplotlib_config_dir)
+    import matplotlib.pyplot as plt
+
+    model_display_names = {
+        "wm": "Metoda Wang-Mendel",
+        "nit": "Metoda Nozaki-Ishibuchi-Tanaka",
+        "sy": "Metoda Sugeno-Yasukawa",
+    }
+    output_name = next(iter(results[0].y_true.keys()))
+    n_results = len(results)
+    fig, axes = plt.subplots(
+        1,
+        n_results,
+        figsize=(5 * n_results, 4.5),
+        squeeze=False,
+    )
+
+    all_true = np.concatenate(
+        [np.asarray(result.y_true[output_name], dtype=float).ravel() for result in results]
+    )
+    all_pred = np.concatenate(
+        [
+            np.asarray(result.predictions[output_name], dtype=float).ravel()
+            for result in results
+        ]
+    )
+    data_min = float(np.nanmin([np.nanmin(all_true), np.nanmin(all_pred)]))
+    data_max = float(np.nanmax([np.nanmax(all_true), np.nanmax(all_pred)]))
+    margin = 0.05 * (data_max - data_min) if data_max > data_min else 1.0
+    axis_min = data_min - margin
+    axis_max = data_max + margin
+
+    for axis, result in zip(axes[0], results):
+        y_true = np.asarray(result.y_true[output_name], dtype=float).ravel()
+        y_pred = np.asarray(result.predictions[output_name], dtype=float).ravel()
+        axis.scatter(y_true, y_pred, alpha=0.75, edgecolors="none")
+        axis.plot([data_min, data_max], [data_min, data_max], "--", linewidth=1)
+        axis.set_title(model_display_names.get(result.name, result.name.upper()))
+        axis.set_xlabel("Wartosci rzeczywiste")
+        axis.set_ylabel("Wartosci przewidywane")
+        axis.set_xlim(axis_min, axis_max)
+        axis.set_ylim(axis_min, axis_max)
+        axis.grid(True, alpha=0.3)
+
+    fig.suptitle(title)
+    fig.tight_layout()
+    if output_path is not None:
+        output_path = Path(output_path)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        fig.savefig(output_path, dpi=300, bbox_inches="tight")
+        print(f"Zapisano wykres: {output_path}")
+
+    if "agg" in plt.get_backend().lower():
+        plt.close(fig)
+    else:
+        plt.show()

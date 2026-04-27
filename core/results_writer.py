@@ -9,6 +9,7 @@ import pandas as pd
 
 DEFAULT_RESULTS_DIR = Path("results")
 DEFAULT_METRICS_PATH = DEFAULT_RESULTS_DIR / "summaries" / "metrics_summary.csv"
+SIGNIFICANT_DIGITS_FORMAT = "%.4g"
 
 
 def _as_1d_array(values) -> np.ndarray:
@@ -61,7 +62,7 @@ def save_metrics_summary(
         ]
         summary = pd.concat([existing_summary, summary], ignore_index=True)
 
-    summary.to_csv(output_path, index=False)
+    summary.to_csv(output_path, index=False, float_format=SIGNIFICANT_DIGITS_FORMAT)
     return output_path
 
 
@@ -103,5 +104,9 @@ def save_predictions(
         data[actual_column] = actual
 
     predictions = pd.DataFrame(data)
-    predictions.to_csv(output_path, index=False)
+    predictions.to_csv(
+        output_path,
+        index=False,
+        float_format=SIGNIFICANT_DIGITS_FORMAT,
+    )
     return output_path

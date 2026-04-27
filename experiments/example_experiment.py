@@ -1,13 +1,15 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 import pandas as pd
 
 from core.data_loader import load_csv_dataset
 from core.experiment_runner import (
     ExperimentConfig,
+    ModelResult,
     _print_results_table,
     evaluate_model,
     print_model_results,
+    plot_predictions_vs_true,
     print_sample_preview,
     print_summary,
     train_nit,
@@ -105,6 +107,96 @@ def print_train_metrics(*results) -> None:
     _print_results_table(*results)
 
 
+def _print_parameter_sensitivity_table(
+    parameter_name: str,
+    rows: list[tuple[float, ModelResult]],
+) -> None:
+    print(
+        f"{parameter_name:<10} | {'Liczba regul':>12} | {'MSE':>12} | "
+        f"{'MAE':>12} | {'RMSE':>12} | {'R^2':>12} | {'Czas [s]':>12}"
+    )
+    print("-" * 93)
+    for parameter_value, result in rows:
+        print(
+            f"{parameter_value:<10.3g} | {result.rule_count:>12} | "
+            f"{result.mse:>12.6f} | {result.mae:>12.6f} | "
+            f"{result.rmse:>12.6f} | {result.r_squared:>12.6f} | "
+            f"{result.training_time_seconds:>12.6f}"
+        )
+
+
+def analyze_nit_alpha_sensitivity(
+    train_data: pd.DataFrame,
+    config: ExperimentConfig,
+    alpha_values: list[float],
+) -> None:
+    print("\n\n" + "=" * 70)
+    print("ANALIZA PARAMETRU ALPHA DLA METODY NIT")
+    print("=" * 70)
+
+    rows = []
+    for alpha in alpha_values:
+        alpha_config = replace(
+            config,
+            nit_params={**(config.nit_params or {}), "alpha": alpha},
+        )
+        (
+            model,
+            training_time,
+            rule_creation_time,
+            structure_time,
+            learning_time,
+        ) = train_nit(train_data, alpha_config)
+        result = evaluate_model(
+            model,
+            "nit",
+            train_data,
+            alpha_config,
+            training_time_seconds=training_time,
+            rule_creation_time_seconds=rule_creation_time,
+            structure_time_seconds=structure_time,
+            learning_time_seconds=learning_time,
+        )
+        rows.append((alpha, result))
+
+    _print_parameter_sensitivity_table("alpha", rows)
+
+
+def analyze_sy_m_sensitivity(
+    train_data: pd.DataFrame,
+    config: ExperimentConfig,
+    m_values: list[float],
+) -> None:
+    print("\n\n" + "=" * 70)
+    print("ANALIZA PARAMETRU M DLA METODY SUGENO-YASUKAWA")
+    print("=" * 70)
+
+    rows = []
+    for m_value in m_values:
+        sy_params = {**(config.sy_params or {}), "m": m_value}
+        m_config = replace(config, sy_params=sy_params)
+        (
+            model,
+            training_time,
+            rule_creation_time,
+            structure_time,
+            learning_time,
+        ) = train_sy(train_data, m_config)
+        result = evaluate_model(
+            model,
+            "sy",
+            train_data,
+            m_config,
+            training_time_seconds=training_time,
+            rule_creation_time_seconds=rule_creation_time,
+            structure_time_seconds=structure_time,
+            learning_time_seconds=learning_time,
+        )
+        rows.append((m_value, result))
+
+    _print_parameter_sensitivity_table("m", rows)
+
+
 def run(scenario: ScenarioConfig | None = None, seed: int = 42):
     scenario = scenario or ScenarioConfig()
     spec = build_example_spec()
@@ -128,6 +220,7 @@ def run(scenario: ScenarioConfig | None = None, seed: int = 42):
         outputs=example_config.outputs,
         fuzzy_sets=example_config.fuzzy_sets,
         universes=example_config.universes,
+        nit_params={"alpha": 1.0},
         sy_params={"n_rules": 3, "eps_sigma": 1.0},
     )
 
@@ -223,6 +316,17 @@ def run(scenario: ScenarioConfig | None = None, seed: int = 42):
     )
     print_train_metrics(wm_train_results, nit_train_results, sy_train_results)
 
+    analyze_nit_alpha_sensitivity(
+        train_data=train_data,
+        config=config,
+        alpha_values=[0.5, 0.8, 1.0, 2.0, 3.0],
+    )
+    analyze_sy_m_sensitivity(
+        train_data=train_data,
+        config=config,
+        m_values=[1.5, 2.0, 2.5, 3.0, 4.0],
+    )
+
     print("\n\n" + "=" * 70)
     print("CZESC 5: TESTOWANIE NA NOWYCH PROBKACH")
     print("=" * 70)
@@ -268,3 +372,10 @@ def run(scenario: ScenarioConfig | None = None, seed: int = 42):
     print_model_results(nit_test_results, config)
     print_model_results(sy_test_results, config)
     print_summary(wm_test_results, nit_test_results, sy_test_results)
+    plot_predictions_vs_true(
+        wm_test_results,
+        nit_test_results,
+        sy_test_results,
+        title="Przykladowy zbior danych: y_pred vs y_true",
+        output_path="results/example_experiment_y_pred_vs_y_true.png",
+    )
