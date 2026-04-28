@@ -1,35 +1,60 @@
-/workspace/Praca_Engeinerska/
+D:\Projekty\Praca_Inzynierska
 |
 +-- main.py
 +-- README.md
 +-- requirements.txt
 +-- Struktura.txt
++-- .gitignore
 |
 +-- core/
 |   +-- __init__.py
 |   +-- data_loader.py
+|   +-- experiment_runner.py
 |   +-- inference.py
 |   +-- membership_functions.py
+|   +-- results_writer.py
+|   +-- scenarios.py
 |   +-- utils.py
+|   |
 |   +-- evaluation/
 |   |   +-- __init__.py
 |   |   +-- metrics.py
+|   |
 |   +-- rule_generators/
 |       +-- __init__.py
 |       +-- nozaki_ishibuchi_tanaka.py
 |       +-- sugeno_yasukawa.py
 |       +-- wang_mendel.py
 |
++-- experiments/
+|   +-- __init__.py
+|   +-- example_experiment.py
+|   +-- sine_process_experiment.py
+|   +-- tep_experiment.py
+|
++-- sandbox/
+|   +-- __init__.py
+|   +-- data.csv
+|   +-- data_analysis.py
+|   +-- example_config.py
+|
 +-- data/
 |   +-- TEP_FaultFree_Testing.csv
 |   +-- TEP_FaultFree_Training.csv
 |
-+-- experiments/
-|   +-- __init__.py
-|   +-- example_experiment.py
-|   +-- tep_experiment.py
-|
-+-- sandbox/
-|   +-- data.csv
-|   +-- data_analysis.py
-|   +-- example_config.py
++-- results/
+    +-- example_experiment_y_pred_vs_y_true.png
+    |
+    +-- plots/
+    |   +-- sinus_comparison_*.png
+    |   +-- sinus_scenario_*.png
+    |   +-- tep_*.png
+    |
+    +-- predictions/
+    |   +-- sinus_baseline.csv
+    |
+    +-- summaries/
+        +-- metrics_summary.csv
+        +-- sinus_rule_variation.csv
+        +-- sinus_scenario_variation.csv
+        +-- tep_rule_variation.csv

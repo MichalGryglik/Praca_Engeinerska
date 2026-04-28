@@ -76,6 +76,37 @@ def _compute_output_label_centroids(output_var, fuzzy_sets, universes):
     }
 
 
+def _antecedent_label_indexes(inputs, fuzzy_sets):
+    return {
+        inp: {label: idx for idx, label in enumerate(fuzzy_sets[inp].keys())}
+        for inp in inputs
+    }
+
+
+def _antecedent_distance(condition, reference_condition, inputs, fuzzy_sets):
+    label_indexes = _antecedent_label_indexes(inputs, fuzzy_sets)
+    distance = 0
+    for idx, inp_name in enumerate(inputs):
+        distance += abs(
+            label_indexes[inp_name][condition[idx]]
+            - label_indexes[inp_name][reference_condition[idx]]
+        )
+    return distance
+
+
+def _find_most_similar_rule(reference_condition, rules_dict, inputs, fuzzy_sets):
+    if not rules_dict:
+        return None, None
+
+    return min(
+        rules_dict.items(),
+        key=lambda item: (
+            _antecedent_distance(item[0], reference_condition, inputs, fuzzy_sets),
+            -float(item[1].get("weight", 0.0)),
+        ),
+    )
+
+
 def generate_rules(
     data,
     inputs,
@@ -210,12 +241,22 @@ def pretty_print_rules(rules, inputs, threshold=0.0):
 
 def apply_rules(inputs, rules_dict, fuzzy_sets, universes, outputs):
     output_var = outputs[0]
+    input_names = list(inputs.keys())
     memberships = {}
     for inp_name, inp_val in inputs.items():
         memberships[inp_name] = {
             name: fuzz.interp_membership(universes[inp_name], mf, inp_val)
             for name, mf in fuzzy_sets[inp_name].items()
         }
+
+    current_condition = tuple(
+        find_best_membership(
+            inputs[inp_name],
+            universes[inp_name],
+            fuzzy_sets[inp_name],
+        )[0]
+        for inp_name in input_names
+    )
 
     output_centroids = _compute_output_label_centroids(
         output_var,
@@ -229,7 +270,7 @@ def apply_rules(inputs, rules_dict, fuzzy_sets, universes, outputs):
 
     for condition, rule_data in rules_dict.items():
         mu_list = []
-        for idx, inp_name in enumerate(inputs.keys()):
+        for idx, inp_name in enumerate(input_names):
             mu_list.append(memberships[inp_name].get(condition[idx], 0.0))
 
         firing_strength = float(np.prod(mu_list))
@@ -267,7 +308,45 @@ def apply_rules(inputs, rules_dict, fuzzy_sets, universes, outputs):
         activated_rules.append(activated_rule)
 
     if denominator == 0.0:
-        return np.nan, []
+        closest_condition, closest_rule = _find_most_similar_rule(
+            current_condition,
+            rules_dict,
+            input_names,
+            fuzzy_sets,
+        )
+        if closest_rule is None:
+            return np.nan, []
+
+        main_rule = closest_rule["main"]
+        main_activation = main_rule["certainty"]
+        numerator += main_activation * output_centroids[main_rule["label"]]
+        denominator += main_activation
+        activated_rule = {
+            "condition": closest_condition,
+            "firing_strength": 1.0,
+            "fallback": True,
+            "main": {
+                "label": main_rule["label"],
+                "certainty": main_rule["certainty"],
+                "activation": main_activation,
+            },
+        }
+
+        secondary_rule = closest_rule.get("secondary")
+        if secondary_rule is not None:
+            secondary_activation = secondary_rule["certainty"]
+            numerator += secondary_activation * output_centroids[secondary_rule["label"]]
+            denominator += secondary_activation
+            activated_rule["secondary"] = {
+                "label": secondary_rule["label"],
+                "certainty": secondary_rule["certainty"],
+                "activation": secondary_activation,
+            }
+
+        activated_rules.append(activated_rule)
+
+    if denominator == 0.0:
+        return np.nan, activated_rules
 
     y_pred = numerator / denominator
     return y_pred, activated_rules

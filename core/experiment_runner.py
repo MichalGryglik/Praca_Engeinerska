@@ -395,9 +395,9 @@ def plot_predictions_vs_true(
     output_name = next(iter(results[0].y_true.keys()))
     n_results = len(results)
     fig, axes = plt.subplots(
-        1,
         n_results,
-        figsize=(5 * n_results, 4.5),
+        1,
+        figsize=(6, 4.5 * n_results),
         squeeze=False,
     )
 
@@ -416,7 +416,7 @@ def plot_predictions_vs_true(
     axis_min = data_min - margin
     axis_max = data_max + margin
 
-    for axis, result in zip(axes[0], results):
+    for axis, result in zip(axes[:, 0], results):
         y_true = np.asarray(result.y_true[output_name], dtype=float).ravel()
         y_pred = np.asarray(result.predictions[output_name], dtype=float).ravel()
         axis.scatter(y_true, y_pred, alpha=0.75, edgecolors="none")

@@ -25,13 +25,33 @@ from core.scenarios import (
 
 
 BASE_INTERVAL_LABELS = ["S2", "S1", "CE", "B1", "B2"]
-TEP_RULE_CONFIGS = [
+BASE_RULE_CONFIGS = [
+    (10, 10),
+]
+STRIPPER_RULE_VARIATION_CONFIGS = [
     (3, 3),
     (5, 3),
-    (10, 10),
     (20, 50),
 ]
-AUTOREGRESSION_CONFIG = (5, 3)
+AUTOREGRESSION_CONFIG = (10, 10)
+STRIPPER_EXPERIMENT_NAME = "stripper_level"
+TEP_EXPERIMENT_SPECS = [
+    {
+        "name": "valve_to_flow",
+        "inputs": ["xmv_9"],
+        "outputs": ["xmeas_19"],
+    },
+    {
+        "name": "stripper_level",
+        "inputs": ["xmv_8", "xmeas_17", "xmv_9", "xmeas_19"],
+        "outputs": ["xmeas_15"],
+    },
+    {
+        "name": "stripper_underflow",
+        "inputs": ["xmv_8"],
+        "outputs": ["xmeas_17"],
+    },
+]
 
 
 @dataclass(frozen=True)
@@ -53,6 +73,25 @@ def _generate_interval_labels(count: int) -> list[str]:
 
 def _unique_columns(columns: list[str]) -> list[str]:
     return list(dict.fromkeys(columns))
+
+
+def _single_output_experiment_specs() -> list[dict[str, list[str] | str]]:
+    expanded_specs = []
+    for experiment_spec in TEP_EXPERIMENT_SPECS:
+        outputs = experiment_spec["outputs"]
+        if len(outputs) == 1:
+            expanded_specs.append(experiment_spec)
+            continue
+
+        for output_name in outputs:
+            expanded_specs.append(
+                {
+                    "name": f"{experiment_spec['name']}_{output_name}",
+                    "inputs": experiment_spec["inputs"],
+                    "outputs": [output_name],
+                }
+            )
+    return expanded_specs
 
 
 def _build_sigma_floor_by_input(
@@ -245,41 +284,21 @@ def _save_rule_variation_summary(rows: list[dict[str, Any]]) -> Path:
     return output_path
 
 
-def run(scenario: ScenarioConfig | None = None, seed: int = 42):
-    scenario = scenario or ScenarioConfig()
-    run_config = {
-        "sample_size": 1000,
-        "test_sample_size": 1000,
-        "inputs": ["xmeas_38", "xmeas_33", "xmeas_27"],
-        "outputs": ["xmeas_1"],
-    }
-    inputs = run_config["inputs"]
-    outputs = run_config["outputs"]
-
-    tep_train = load_tep_train(n_samples=run_config["sample_size"])
-    tep_test = load_tep_test(n_samples=run_config["test_sample_size"])
-    scenario_columns = _unique_columns(inputs + outputs)
-    tep_train = tep_train.copy()
-    tep_train[scenario_columns] = apply_training_scenario(
-        data=tep_train[scenario_columns],
-        scenario=scenario,
-        seed=seed,
-        gaussian_noise_columns=outputs,
-        missing_columns=scenario_columns,
-        outlier_columns=outputs,
+def _run_experiment_spec(
+    experiment_name: str,
+    tep_train: pd.DataFrame,
+    tep_test: pd.DataFrame,
+    inputs: list[str],
+    outputs: list[str],
+    sample_size: int,
+    rule_configs: list[tuple[int, int]],
+) -> tuple[list[TepExperimentRun], list[dict[str, Any]]]:
+    print("\n" + "#" * 82)
+    print(
+        f"TEP: {experiment_name} | inputs={', '.join(inputs)} "
+        f"-> outputs={', '.join(outputs)}"
     )
-    tep_train[scenario_columns] = prepare_numeric_training_data(
-        tep_train[scenario_columns],
-        columns=scenario_columns,
-    )
-
-    print_scenario_summary(
-        title="EKSPERYMENT: Tennessee Eastman Process",
-        scenario=scenario,
-        sample_size=run_config["sample_size"],
-        missing_columns=scenario_columns,
-        outlier_columns=outputs,
-    )
+    print("#" * 82)
 
     autoregression_inputs = outputs.copy()
     autoregression_interval_count, autoregression_sy_rule_count = AUTOREGRESSION_CONFIG
@@ -288,7 +307,7 @@ def run(scenario: ScenarioConfig | None = None, seed: int = 42):
         test_data=tep_test,
         inputs=autoregression_inputs,
         outputs=outputs,
-        sample_size=run_config["sample_size"],
+        sample_size=sample_size,
         interval_count=autoregression_interval_count,
         sy_rule_count=autoregression_sy_rule_count,
     )
@@ -302,7 +321,7 @@ def run(scenario: ScenarioConfig | None = None, seed: int = 42):
     )
 
     run_results = []
-    for interval_count, sy_rule_count in TEP_RULE_CONFIGS:
+    for interval_count, sy_rule_count in rule_configs:
         print(
             "\n"
             + "=" * 70
@@ -314,7 +333,7 @@ def run(scenario: ScenarioConfig | None = None, seed: int = 42):
             test_data=tep_test,
             inputs=inputs,
             outputs=outputs,
-            sample_size=run_config["sample_size"],
+            sample_size=sample_size,
             interval_count=interval_count,
             sy_rule_count=sy_rule_count,
         )
@@ -325,25 +344,95 @@ def run(scenario: ScenarioConfig | None = None, seed: int = 42):
             result.nit,
             result.sy,
             title=(
-                "Tennessee Eastman Process: "
+                f"Tennessee Eastman Process: {experiment_name}, "
                 f"przedzialy={interval_count}, SY={sy_rule_count}"
             ),
             output_path=(
                 "results/plots/"
-                f"tep_predictions_intervals_{interval_count}_sy_{sy_rule_count}.png"
+                f"tep_{experiment_name}_intervals_{interval_count}_sy_{sy_rule_count}.png"
             ),
         )
 
-    summary_rows = [row for result in run_results for row in _metric_rows(result)]
+    summary_rows = [
+        {"experiment": experiment_name, **row}
+        for result in run_results
+        for row in _metric_rows(result)
+    ]
     _print_rule_variation_table(summary_rows)
-    rule_variation_path = _save_rule_variation_summary(summary_rows)
+    return run_results, summary_rows
+
+
+def run(scenario: ScenarioConfig | None = None, seed: int = 42):
+    scenario = scenario or ScenarioConfig()
+    run_config = {
+        "sample_size": 1000,
+        "test_sample_size": 1000,
+    }
+    experiment_specs = _single_output_experiment_specs()
+    all_inputs = [
+        input_name
+        for experiment_spec in experiment_specs
+        for input_name in experiment_spec["inputs"]
+    ]
+    all_outputs = [
+        output_name
+        for experiment_spec in experiment_specs
+        for output_name in experiment_spec["outputs"]
+    ]
+
+    tep_train = load_tep_train(n_samples=run_config["sample_size"])
+    tep_test = load_tep_test(n_samples=run_config["test_sample_size"])
+    scenario_columns = _unique_columns(all_inputs + all_outputs)
+    scenario_outputs = _unique_columns(all_outputs)
+    tep_train = tep_train.copy()
+    tep_train[scenario_columns] = apply_training_scenario(
+        data=tep_train[scenario_columns],
+        scenario=scenario,
+        seed=seed,
+        gaussian_noise_columns=scenario_outputs,
+        missing_columns=scenario_columns,
+        outlier_columns=scenario_outputs,
+    )
+    tep_train[scenario_columns] = prepare_numeric_training_data(
+        tep_train[scenario_columns],
+        columns=scenario_columns,
+    )
+
+    print_scenario_summary(
+        title="EKSPERYMENT: Tennessee Eastman Process",
+        scenario=scenario,
+        sample_size=run_config["sample_size"],
+        missing_columns=scenario_columns,
+        outlier_columns=scenario_outputs,
+    )
+
+    all_run_results = []
+    all_summary_rows = []
+    for experiment_spec in experiment_specs:
+        rule_configs = BASE_RULE_CONFIGS.copy()
+        if experiment_spec["name"] == STRIPPER_EXPERIMENT_NAME:
+            rule_configs.extend(STRIPPER_RULE_VARIATION_CONFIGS)
+
+        run_results, summary_rows = _run_experiment_spec(
+            experiment_name=experiment_spec["name"],
+            tep_train=tep_train,
+            tep_test=tep_test,
+            inputs=experiment_spec["inputs"],
+            outputs=experiment_spec["outputs"],
+            sample_size=run_config["sample_size"],
+            rule_configs=rule_configs,
+        )
+        all_run_results.extend(run_results)
+        all_summary_rows.extend(summary_rows)
+
+    rule_variation_path = _save_rule_variation_summary(all_summary_rows)
     print(f"Zapisano zbiorcze wyniki wariantow: {rule_variation_path}")
 
     metrics_path = save_metrics_summary(
         "tep",
         [
             model_result
-            for result in run_results
+            for result in all_run_results
             for model_result in [result.wm, result.nit, result.sy]
         ],
     )

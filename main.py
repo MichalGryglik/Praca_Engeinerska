@@ -4,6 +4,8 @@ from experiments.tep_experiment import run as run_tep_experiment
 
 
 def main():
+    run_sine_process_experiment()
+    run_example_experiment()
     run_tep_experiment()
 
 

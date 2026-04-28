@@ -334,7 +334,7 @@ def _plot_result_set(
         "nit": ("Nozaki-Ishibuchi-Tanaka", "g--"),
         "sy": ("Sugeno-Yasukawa", "m--"),
     }
-    fig, axes = plt.subplots(1, 3, figsize=(15, 5))
+    fig, axes = plt.subplots(3, 1, figsize=(7, 12))
     for axis, method in zip(axes, ["wm", "nit", "sy"]):
         result = getattr(run_result, method)
         displayed_rule_count = (
