@@ -10,11 +10,9 @@ D:\Projekty\Praca_Inzynierska
 |   +-- __init__.py
 |   +-- data_loader.py
 |   +-- experiment_runner.py
-|   +-- inference.py
 |   +-- membership_functions.py
 |   +-- results_writer.py
 |   +-- scenarios.py
-|   +-- utils.py
 |   |
 |   +-- evaluation/
 |   |   +-- __init__.py
