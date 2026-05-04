@@ -11,6 +11,12 @@ import numpy as np
 import skfuzzy as fuzz
 
 
+def _sigma_floor_for_input(eps_sigma, input_name):
+    if isinstance(eps_sigma, dict):
+        return max(float(eps_sigma.get(input_name, 1e-6)), 1e-6)
+    return max(float(eps_sigma), 1e-6)
+
+
 def initialize_clusters_with_cmeans(data, inputs, n_rules, m=2.0, error=1e-5, maxiter=1000, seed=42):
     """Inicjalizacja centrów klastrów algorytmem FCM (cmeans).
 
@@ -50,7 +56,38 @@ def initialize_clusters_with_cmeans(data, inputs, n_rules, m=2.0, error=1e-5, ma
     return centers, membership_matrix
 
 
-def build_initial_rules_from_clusters(centers, inputs, outputs, eps_sigma):
+def estimate_cluster_sigmas(data, inputs, membership_matrix, m=2.0, eps_sigma=1e-6):
+    """Wyznacza szerokosci gaussow z wazonego rozrzutu probek w klastrach FCM."""
+    x = data[inputs].to_numpy(dtype=float)
+    membership_matrix = np.asarray(membership_matrix, dtype=float)
+    if membership_matrix.ndim != 2:
+        raise ValueError("membership_matrix musi byc tablica 2D.")
+
+    n_rules = membership_matrix.shape[0]
+    sigmas = np.zeros((n_rules, len(inputs)), dtype=float)
+    weights_matrix = np.power(np.clip(membership_matrix, 0.0, 1.0), float(m))
+
+    for rule_idx in range(n_rules):
+        weights = weights_matrix[rule_idx]
+        weight_sum = float(np.sum(weights))
+        for input_idx, input_name in enumerate(inputs):
+            sigma_floor = _sigma_floor_for_input(eps_sigma, input_name)
+            if weight_sum <= 1e-12:
+                sigmas[rule_idx, input_idx] = sigma_floor
+                continue
+
+            x_col = x[:, input_idx]
+            center = float(np.sum(weights * x_col) / weight_sum)
+            variance = float(np.sum(weights * np.square(x_col - center)) / weight_sum)
+            sigmas[rule_idx, input_idx] = max(
+                float(np.sqrt(max(variance, 0.0))),
+                sigma_floor,
+            )
+
+    return sigmas
+
+
+def build_initial_rules_from_clusters(centers, inputs, outputs, eps_sigma, sigmas=None):
     """Buduje początkową bazę reguł Sugeno na podstawie centrów klastrów.
 
     Parameters
@@ -81,9 +118,10 @@ def build_initial_rules_from_clusters(centers, inputs, outputs, eps_sigma):
             "Liczba kolumn w 'centers' musi odpowiadać liczbie elementów w 'inputs'."
         )
 
-    # Normalizujemy minimalną szerokość funkcji przynależności,
-    # aby uniknąć zerowych lub ujemnych szerokości zbiorów rozmytych
-    sigma_value = max(float(eps_sigma), 1e-6)
+    if sigmas is not None:
+        sigmas = np.asarray(sigmas, dtype=float)
+        if sigmas.shape != centers.shape:
+            raise ValueError("Parametr 'sigmas' musi miec taki sam ksztalt jak 'centers'.")
 
     # Inicjalizujemy pusty słownik, który będzie przechowywał wszystkie reguły startowe
     rules_dict = {}
@@ -97,6 +135,12 @@ def build_initial_rules_from_clusters(centers, inputs, outputs, eps_sigma):
         # dla każdej zmiennej wejściowej zapisujemy środek i szerokość sigma
         antecedent_params = {}
         for input_idx, input_name in enumerate(inputs):
+            sigma_floor = _sigma_floor_for_input(eps_sigma, input_name)
+            sigma_value = (
+                max(float(sigmas[rule_idx, input_idx]), sigma_floor)
+                if sigmas is not None
+                else sigma_floor
+            )
             antecedent_params[input_name] = {
                 "center": float(center_vector[input_idx]),
                 "sigma": sigma_value,
@@ -297,9 +341,6 @@ def update_antecedents(data, inputs, rules_dict, normalized_strengths, eps_sigma
     # Przygotowujemy macierz wejść do obliczeń wektorowych
     x = data[inputs].to_numpy(dtype=float)
 
-    # Minimalna dopuszczalna sigma (zabezpieczenie przed zerem/ujemną wartością)
-    sigma_floor = max(float(eps_sigma), 1e-6)
-
     # Dla każdej reguły aktualizujemy parametry antecedentu osobno dla każdego wejścia
     for rule_col, rule_id in enumerate(rule_ids):
         # Jeżeli reguła została wcześniej usunięta, pomijamy ją
@@ -318,6 +359,7 @@ def update_antecedents(data, inputs, rules_dict, normalized_strengths, eps_sigma
         antecedent = rules_dict[rule_id].setdefault("antecedent", {})
 
         for input_idx, input_name in enumerate(inputs):
+            sigma_floor = _sigma_floor_for_input(eps_sigma, input_name)
             # Pobieramy wszystkie wartości danej zmiennej wejściowej
             x_col = x[:, input_idx]
 

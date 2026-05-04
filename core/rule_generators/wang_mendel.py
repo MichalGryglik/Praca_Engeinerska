@@ -5,6 +5,38 @@ import numpy as np
 import skfuzzy as fuzz
 from core.membership_functions import find_best_membership
 
+
+def _antecedent_label_indexes(inputs, fuzzy_sets):
+    return {
+        inp: {label: idx for idx, label in enumerate(fuzzy_sets[inp].keys())}
+        for inp in inputs
+    }
+
+
+def _antecedent_distance(condition, reference_condition, inputs, fuzzy_sets):
+    label_indexes = _antecedent_label_indexes(inputs, fuzzy_sets)
+    distance = 0
+    for idx, inp_name in enumerate(inputs):
+        distance += abs(
+            label_indexes[inp_name][condition[idx]]
+            - label_indexes[inp_name][reference_condition[idx]]
+        )
+    return distance
+
+
+def _find_most_similar_rule(reference_condition, rules_dict, inputs, fuzzy_sets):
+    if not rules_dict:
+        return None, None
+
+    return min(
+        rules_dict.items(),
+        key=lambda item: (
+            _antecedent_distance(item[0], reference_condition, inputs, fuzzy_sets),
+            -float(item[1][1] if isinstance(item[1], tuple) else 0.0),
+        ),
+    )
+
+
 def generate_rules(data, inputs, outputs, fuzzy_sets, universes):
     rules_dict = {}
 
@@ -44,18 +76,29 @@ def apply_rules(inputs, rules_dict, fuzzy_sets, universes, outputs):
         activated: lista aktywnych reguł (y_label, siła)
     """
 
+    input_names = list(inputs.keys())
+
     # --- Przynależności wejść ---
     memberships = {}
     for inp_name, inp_val in inputs.items():
         memberships[inp_name] = {name: fuzz.interp_membership(universes[inp_name], mf, inp_val)
                                  for name, mf in fuzzy_sets[inp_name].items()}
 
+    current_condition = tuple(
+        find_best_membership(
+            inputs[inp_name],
+            universes[inp_name],
+            fuzzy_sets[inp_name],
+        )[0]
+        for inp_name in input_names
+    )
+
     # --- Aktywacja reguł ---
     activated = []
     for condition, (y_label, rule_strength) in rules_dict.items():
         # condition to krotka etykiet wszystkich wejść
         mu_list = []
-        for idx, inp_name in enumerate(inputs.keys()):
+        for idx, inp_name in enumerate(input_names):
             label_in_condition = condition[idx]
             mu_list.append(memberships[inp_name].get(label_in_condition, 0))
         
@@ -64,7 +107,22 @@ def apply_rules(inputs, rules_dict, fuzzy_sets, universes, outputs):
             activated.append((y_label, firing_strength))
 
     if not activated:
-        y_pred = np.nan
+        _, closest_rule = _find_most_similar_rule(
+            current_condition,
+            rules_dict,
+            input_names,
+            fuzzy_sets,
+        )
+        if closest_rule is None:
+            y_pred = np.nan
+        else:
+            y_label = closest_rule[0] if isinstance(closest_rule, tuple) else closest_rule
+            y_pred = fuzz.defuzz(
+                universes[outputs[0]],
+                fuzzy_sets[outputs[0]][y_label],
+                'centroid',
+            )
+            activated.append((y_label, 1.0))
     else:
         # --- Agregacja wyników ---
         numerator = 0
